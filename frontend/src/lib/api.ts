@@ -94,6 +94,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  updatePlayerStat: (
+    dynastyId: number,
+    playerId: number,
+    statId: number,
+    body: Partial<PlayerSeasonStat>,
+  ) =>
+    req<PlayerSeasonStat>(`/dynasties/${dynastyId}/players/${playerId}/stats/${statId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deletePlayerStat: (dynastyId: number, playerId: number, statId: number) =>
+    req<{ ok: boolean }>(`/dynasties/${dynastyId}/players/${playerId}/stats/${statId}`, {
+      method: "DELETE",
+    }),
 
   // games
   listGames: (seasonId: number) => req<Game[]>(`/seasons/${seasonId}/games`),
@@ -165,6 +179,30 @@ export const api = {
     fd.append("file", file);
     fd.append("update_existing", String(update_existing));
     const res = await fetch(`/dynasties/${dynastyId}/import/roster/file`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return (await res.json()) as ImportResult;
+  },
+  importSeasonStatsText: (dynastyId: number, text: string, season_year?: number) =>
+    req<ImportResult>(`/dynasties/${dynastyId}/import/season-stats/text`, {
+      method: "POST",
+      body: JSON.stringify({ text, season_year }),
+    }),
+  previewSeasonStats: (dynastyId: number, text: string) =>
+    req<{ rows: unknown[]; warnings: string[]; count: number }>(
+      `/dynasties/${dynastyId}/import/season-stats/preview`,
+      {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      },
+    ),
+  importSeasonStatsFile: async (dynastyId: number, file: File, season_year?: number) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (season_year != null) fd.append("season_year", String(season_year));
+    const res = await fetch(`/dynasties/${dynastyId}/import/season-stats/file`, {
       method: "POST",
       body: fd,
     });

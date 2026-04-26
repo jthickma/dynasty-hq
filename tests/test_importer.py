@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.importer import import_roster, parse_roster_csv
-from app.models import Dynasty, Player
+from app.importer import import_roster, import_season_stats, parse_roster_csv, parse_season_stats_text
+from app.models import Dynasty, Player, PlayerSeasonStat
 
 CORE_CSV = """RS,NAME,YEAR,POS,OVR,SPD,ACC,AGI,COD,STR,AWR,CAR,BCV
 yes,John Smith,JR (RS),QB,87,78,80,82,79,65,85,,
@@ -21,6 +21,26 @@ PREAMBLE_CSV = """Here are your results! To use them with Max's Roster Support, 
 
 RS,NAME,YEAR,POS,OVR,SPD,ACC,AGI,COD,STR,AWR,CAR,BCV
 ,Anon,FR,QB,78,75,80,82,79,65,70,,"""
+
+
+SEASON_STATS_TEXT = """AQUINAS - RUSHING
+NAME,POS,GP,CAR,▼YARDS,AVG,TD,AVG G,20+,BTK,YAC,LONG
+T.Yancey,HB,2,59,317,5.4,5,158.5,4,8,113,35
+L.Davis,QB,2,17,84,4.9,2,42.0,2,4,40,27
+
+AQUINAS - PASSING
+NAME,POS,GP,COMP,ATT,COMP%,▼YARDS,TD,TD %,INT,INT %,TD:IN
+L.Davis,OB,2,60,80,75%,686,5,6.3,0,0.0,5.0
+
+AQUINAS - RECEIVING
+NAME,POS,GP,REC,▼YARDS,AVG,TD,AVG G,LONG,RAC,RAC.AVG,DROP
+T.Konz,WR,2,16,176,11.0,1,88.0,20,72,4.5,0
+T.Yancey,HB,2,4,39,9.8,0,19.5,13,26,6.5,1
+
+AQUINAS - DEFENSE
+NAME,POS,GP,SOLO,ASSISTS,▼TAK,TFL,SACK,INT,INT.YDS,INT.AVG,INT.L
+S.DeLuca,SAM,2,11,2,13,1,0.0,0,0,0.0,0
+"""
 
 
 def make_session() -> Session:
@@ -123,3 +143,78 @@ def test_import_handles_preamble():
 
     result = import_roster(session, dynasty.id, stripped)
     assert result.created == 1
+
+
+def test_parse_season_stats_text():
+    rows, warnings = parse_season_stats_text(SEASON_STATS_TEXT)
+    assert warnings == []
+    assert len(rows) == 6
+
+    passer = next(r for r in rows if r["name"] == "L.Davis" and "pass_yds" in r)
+    assert passer["pos"] == "QB"
+    assert passer["pass_comp"] == 60
+    assert passer["pass_pct"] == 75.0
+    assert passer["pass_yds"] == 686
+    assert passer["pass_td_int_ratio"] == 5.0
+
+    defender = next(r for r in rows if r["name"] == "S.DeLuca")
+    assert defender["tackles"] == 13
+    assert defender["sacks"] == 0.0
+
+
+def test_import_season_stats_creates_and_updates_player_stats():
+    session = make_session()
+    dynasty = Dynasty(name="Test", school="OKST", current_season_year=2026)
+    session.add(dynasty)
+    session.commit()
+    session.refresh(dynasty)
+
+    players = [
+        Player(dynasty_id=dynasty.id, name="T.Yancey", pos="HB"),
+        Player(dynasty_id=dynasty.id, name="L.Davis", pos="QB"),
+        Player(dynasty_id=dynasty.id, name="T.Konz", pos="WR"),
+        Player(dynasty_id=dynasty.id, name="S.DeLuca", pos="MLB"),
+    ]
+    for player in players:
+        session.add(player)
+    session.commit()
+
+    result = import_season_stats(session, dynasty.id, 2026, SEASON_STATS_TEXT)
+    assert result.created == 4
+    assert result.updated == 2
+    assert result.skipped == 0
+
+    davis = session.exec(select(Player).where(Player.name == "L.Davis")).first()
+    davis_stats = session.exec(
+        select(PlayerSeasonStat).where(
+            PlayerSeasonStat.player_id == davis.id,
+            PlayerSeasonStat.season_year == 2026,
+        )
+    ).first()
+    assert davis_stats.games_played == 2
+    assert davis_stats.pass_att == 80
+    assert davis_stats.pass_yds == 686
+    assert davis_stats.rush_att == 17
+    assert davis_stats.rush_yds == 84
+
+    yancey = session.exec(select(Player).where(Player.name == "T.Yancey")).first()
+    yancey_stats = session.exec(
+        select(PlayerSeasonStat).where(
+            PlayerSeasonStat.player_id == yancey.id,
+            PlayerSeasonStat.season_year == 2026,
+        )
+    ).first()
+    assert yancey_stats.rush_yds == 317
+    assert yancey_stats.receptions == 4
+    assert yancey_stats.rec_drop == 1
+
+    defender = session.exec(select(Player).where(Player.name == "S.DeLuca")).first()
+    defender_stats = session.exec(
+        select(PlayerSeasonStat).where(
+            PlayerSeasonStat.player_id == defender.id,
+            PlayerSeasonStat.season_year == 2026,
+        )
+    ).first()
+    assert defender_stats.solo_tackles == 11
+    assert defender_stats.assisted_tackles == 2
+    assert defender_stats.tackles == 13

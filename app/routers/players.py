@@ -113,3 +113,48 @@ def add_player_stat(
     session.commit()
     session.refresh(stat)
     return stat
+
+
+@router.patch("/{player_id}/stats/{stat_id}", response_model=PlayerSeasonStatRead)
+def update_player_stat(
+    dynasty_id: int,
+    player_id: int,
+    stat_id: int,
+    patch: dict,
+    session: Session = Depends(get_session),
+):
+    p = session.get(Player, player_id)
+    if not p or p.dynasty_id != dynasty_id:
+        raise HTTPException(404, "Player not found")
+
+    stat = session.get(PlayerSeasonStat, stat_id)
+    if not stat or stat.player_id != player_id:
+        raise HTTPException(404, "Season stat not found")
+
+    for k, v in patch.items():
+        if k not in {"id", "player_id"} and hasattr(stat, k):
+            setattr(stat, k, v)
+    session.add(stat)
+    session.commit()
+    session.refresh(stat)
+    return stat
+
+
+@router.delete("/{player_id}/stats/{stat_id}")
+def delete_player_stat(
+    dynasty_id: int,
+    player_id: int,
+    stat_id: int,
+    session: Session = Depends(get_session),
+):
+    p = session.get(Player, player_id)
+    if not p or p.dynasty_id != dynasty_id:
+        raise HTTPException(404, "Player not found")
+
+    stat = session.get(PlayerSeasonStat, stat_id)
+    if not stat or stat.player_id != player_id:
+        raise HTTPException(404, "Season stat not found")
+
+    session.delete(stat)
+    session.commit()
+    return {"ok": True}

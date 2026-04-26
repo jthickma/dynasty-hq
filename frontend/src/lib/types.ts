@@ -141,17 +141,43 @@ export interface PlayerSeasonStat {
   season_year: number;
   ovr_start: number | null;
   ovr_end: number | null;
+  games_played: number | null;
+  pass_comp: number | null;
+  pass_att: number | null;
+  pass_pct: number | null;
   pass_yds: number | null;
   pass_td: number | null;
+  pass_td_pct: number | null;
   pass_int: number | null;
+  pass_int_pct: number | null;
+  pass_td_int_ratio: number | null;
+  rush_att: number | null;
   rush_yds: number | null;
+  rush_avg: number | null;
   rush_td: number | null;
-  rec_yds: number | null;
-  rec_td: number | null;
+  rush_yds_per_game: number | null;
+  rush_20_plus: number | null;
+  rush_broken_tackles: number | null;
+  rush_yac: number | null;
+  rush_long: number | null;
   receptions: number | null;
+  rec_yds: number | null;
+  rec_avg: number | null;
+  rec_td: number | null;
+  rec_yds_per_game: number | null;
+  rec_long: number | null;
+  rec_rac: number | null;
+  rec_rac_avg: number | null;
+  rec_drop: number | null;
+  solo_tackles: number | null;
+  assisted_tackles: number | null;
   tackles: number | null;
+  tfl: number | null;
   sacks: number | null;
   interceptions: number | null;
+  interception_yards: number | null;
+  interception_avg: number | null;
+  interception_long: number | null;
   ff: number | null;
   fr: number | null;
 }
@@ -180,9 +206,9 @@ export type StatLeaders = Record<
 export interface ImportResult {
   created: number;
   updated: number;
-  unchanged: number;
-  warnings: string[];
+  skipped: number;
   errors: string[];
+  total_rows: number;
 }
 
 export const POSITION_GROUPS = ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "ST"] as const;
