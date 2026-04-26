@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+.env
+data/
+*.db
+*.db-journal
+.DS_Store
+.idea/
+.vscode/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+node_modules/
+dist/
+*.log
+
+# Build artifacts
+*.egg-info/
+build/
+.eggs/

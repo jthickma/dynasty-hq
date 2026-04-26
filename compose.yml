@@ -1,0 +1,11 @@
+services:
+  dynasty-hq:
+    build: .
+    container_name: dynasty-hq
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    labels:
+      proxy.aliases: dynasty
+      proxy.#dynasty.port: "8000"
+      proxy.#dynasty.healthcheck.path: /health
