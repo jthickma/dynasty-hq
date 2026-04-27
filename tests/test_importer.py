@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.importer import import_roster, import_season_stats, parse_roster_csv, parse_season_stats_text
+from app.importer import (
+    import_roster,
+    import_season_stats,
+    parse_roster_csv,
+    parse_season_stats_text,
+)
 from app.models import Dynasty, Player, PlayerSeasonStat
 
 CORE_CSV = """RS,NAME,YEAR,POS,OVR,SPD,ACC,AGI,COD,STR,AWR,CAR,BCV
@@ -124,9 +129,9 @@ def test_import_roster_updates_without_clobbering():
     assert result.created == 0
 
     qb = session.exec(select(Player).where(Player.name == "John Smith")).first()
-    assert qb.ovr == 90          # updated
-    assert qb.year == "SR"       # updated
-    assert qb.awr == 85          # NOT clobbered — still 85 from original import
+    assert qb.ovr == 90  # updated
+    assert qb.year == "SR"  # updated
+    assert qb.awr == 85  # NOT clobbered — still 85 from original import
 
 
 def test_import_handles_preamble():
@@ -138,6 +143,7 @@ def test_import_handles_preamble():
 
     # strip_preamble lives on the router; simulate it here by finding header
     from app.routers.importer import _strip_preamble
+
     stripped = _strip_preamble(PREAMBLE_CSV)
     assert stripped.startswith("RS,NAME")
 

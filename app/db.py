@@ -19,6 +19,7 @@ def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     # Import models so SQLModel sees them before create_all
     from app import models  # noqa: F401
+
     SQLModel.metadata.create_all(engine)
 
 

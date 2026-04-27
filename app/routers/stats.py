@@ -95,9 +95,7 @@ def roster_summary(
     session: Session = Depends(get_session),
 ) -> dict:
     """Counts by position group and class year."""
-    all_players = session.exec(
-        select(Player).where(Player.dynasty_id == dynasty_id)
-    ).all()
+    all_players = session.exec(select(Player).where(Player.dynasty_id == dynasty_id)).all()
 
     by_group = {g: 0 for g in POSITION_GROUPS}
     by_year = {"FR": 0, "SO": 0, "JR": 0, "SR": 0, "UNK": 0}

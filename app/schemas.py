@@ -2,6 +2,7 @@
 Separate read schemas keep relationship fields out of API responses
 and avoid SQLModel's table-class serialization quirks.
 """
+
 from datetime import datetime
 from typing import Optional
 

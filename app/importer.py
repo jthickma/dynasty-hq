@@ -12,14 +12,63 @@ from app.models import Player, PlayerSeasonStat
 
 # Canonical MaxPlaysCFB column order. Used to map headers → model fields.
 # Keep lowercase for matching; map a couple of reserved/Python-safe aliases.
-CORE_COLUMNS = ["rs", "name", "year", "pos", "ovr",
-                "spd", "acc", "agi", "cod", "str", "awr", "car", "bcv"]
+CORE_COLUMNS = [
+    "rs",
+    "name",
+    "year",
+    "pos",
+    "ovr",
+    "spd",
+    "acc",
+    "agi",
+    "cod",
+    "str",
+    "awr",
+    "car",
+    "bcv",
+]
 
 EXTENDED_COLUMNS = [
-    "jmp", "sta", "inj", "tgh", "btk", "trk", "sfa", "jkm", "cth", "cit",
-    "spc", "srr", "mrr", "drr", "rls", "thp", "sac", "mac", "dac", "tup",
-    "run", "pac", "bsk", "rbk", "pbk", "pbp", "pbf", "rbp", "rbf", "lbk",
-    "ibl", "tak", "hpw", "pur", "prc", "bsh", "pmv", "fmv", "zcv", "mcv",
+    "jmp",
+    "sta",
+    "inj",
+    "tgh",
+    "btk",
+    "trk",
+    "sfa",
+    "jkm",
+    "cth",
+    "cit",
+    "spc",
+    "srr",
+    "mrr",
+    "drr",
+    "rls",
+    "thp",
+    "sac",
+    "mac",
+    "dac",
+    "tup",
+    "run",
+    "pac",
+    "bsk",
+    "rbk",
+    "pbk",
+    "pbp",
+    "pbf",
+    "rbp",
+    "rbf",
+    "lbk",
+    "ibl",
+    "tak",
+    "hpw",
+    "pur",
+    "prc",
+    "bsh",
+    "pmv",
+    "fmv",
+    "zcv",
+    "mcv",
     "prs",
 ]
 
@@ -400,7 +449,9 @@ def _resolve_stat_player(candidates: list[Player], imported_pos: Optional[str]) 
         return None
 
     normalized_pos = imported_pos.upper()
-    exact_matches = [player for player in candidates if (player.pos or "").upper() == normalized_pos]
+    exact_matches = [
+        player for player in candidates if (player.pos or "").upper() == normalized_pos
+    ]
     if len(exact_matches) == 1:
         return exact_matches[0]
 
@@ -408,9 +459,7 @@ def _resolve_stat_player(candidates: list[Player], imported_pos: Optional[str]) 
     if imported_group is None:
         return None
 
-    grouped = [
-        player for player in candidates if _position_group(player.pos) == imported_group
-    ]
+    grouped = [player for player in candidates if _position_group(player.pos) == imported_group]
     if len(grouped) == 1:
         return grouped[0]
     return None
@@ -440,10 +489,10 @@ def parse_roster_csv(raw_csv: str) -> tuple[list[dict], list[str]]:
     headers = [_normalize_header(h) for h in raw_header]
 
     # Validate header — first 13 columns MUST match core schema.
-    if headers[:len(CORE_COLUMNS)] != CORE_COLUMNS:
+    if headers[: len(CORE_COLUMNS)] != CORE_COLUMNS:
         warnings.append(
             f"Header does not start with canonical MaxPlaysCFB columns. "
-            f"Got: {headers[:len(CORE_COLUMNS)]}"
+            f"Got: {headers[: len(CORE_COLUMNS)]}"
         )
 
     unknown = [h for h in headers if h not in ALL_KNOWN]

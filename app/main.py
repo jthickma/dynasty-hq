@@ -64,7 +64,9 @@ if _STATIC_DIR.is_dir():
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str):
         # Reserved API prefixes — let FastAPI 404 handle if matched but missed.
-        if full_path.startswith(("dynasties", "seasons", "health", "docs", "openapi.json", "redoc")):
+        if full_path.startswith(
+            ("dynasties", "seasons", "health", "docs", "openapi.json", "redoc")
+        ):
             raise HTTPException(status_code=404)
         # Serve real static files (favicon, robots, etc.) if present.
         candidate = _STATIC_DIR / full_path

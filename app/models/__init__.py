@@ -6,6 +6,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 # ---------- Dynasty / Season ----------
 
+
 class Dynasty(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
@@ -48,6 +49,7 @@ class Season(SQLModel, table=True):
 
 # ---------- Games ----------
 
+
 class Game(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     season_id: int = Field(foreign_key="season.id", index=True)
@@ -89,19 +91,21 @@ class Game(SQLModel, table=True):
 
 # ---------- Players ----------
 
+
 class Player(SQLModel, table=True):
     """
     Single row per player. Stats follow MaxPlaysCFB CSV field order.
     All rating columns nullable — only columns visible in the screenshot
     get populated. Unknown ratings stay NULL rather than 0.
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     dynasty_id: int = Field(foreign_key="dynasty.id", index=True)
 
     # core
-    rs: Optional[str] = None          # "yes" if active redshirt icon visible
+    rs: Optional[str] = None  # "yes" if active redshirt icon visible
     name: str = Field(index=True)
-    year: Optional[str] = None        # FR, SO, JR, SR, with optional (RS) suffix
+    year: Optional[str] = None  # FR, SO, JR, SR, with optional (RS) suffix
     pos: Optional[str] = Field(default=None, index=True)
     ovr: Optional[int] = None
 
@@ -171,6 +175,7 @@ class Player(SQLModel, table=True):
 
 class PlayerSeasonStat(SQLModel, table=True):
     """Season-by-season progression. Separate from Player so career graphs work."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     player_id: int = Field(foreign_key="player.id", index=True)
     season_year: int
@@ -226,6 +231,7 @@ class PlayerSeasonStat(SQLModel, table=True):
 
 # ---------- Recruiting ----------
 
+
 class Recruit(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     dynasty_id: int = Field(foreign_key="dynasty.id", index=True)
@@ -238,7 +244,7 @@ class Recruit(SQLModel, table=True):
     position_rank: Optional[int] = None
 
     school_leader: Optional[str] = None
-    interest_level: int = 0           # 0-100 for our school
+    interest_level: int = 0  # 0-100 for our school
     hours_spent_week: int = 0
     total_hours_spent: int = 0
 
