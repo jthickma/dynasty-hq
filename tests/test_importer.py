@@ -224,3 +224,101 @@ def test_import_season_stats_creates_and_updates_player_stats():
     assert defender_stats.solo_tackles == 11
     assert defender_stats.assisted_tackles == 2
     assert defender_stats.tackles == 13
+
+
+# ---- Edge case tests added for robustness fixes ---------------------------
+
+
+def test_to_int_handles_decimal_displays():
+    """Bug: _to_int used to strip the '.', turning '5.4' into 54."""
+    from app.importer import _to_int
+
+    assert _to_int("5.4") == 5
+    assert _to_int("113.0") == 113
+    assert _to_int("1,234") == 1234
+    assert _to_int("75%") == 75
+    assert _to_int(" - ") is None
+    assert _to_int("N/A") is None
+
+
+def test_parse_skips_team_total_rows():
+    text = """AQUINAS - RUSHING
+NAME,POS,GP,CAR,▼YARDS,AVG,TD,AVG G,20+,BTK,YAC,LONG
+T.Yancey,HB,2,59,317,5.4,5,158.5,4,8,113,35
+TEAM,,2,80,400,5.0,7,200.0,5,10,150,40
+TOTAL,,2,80,400,5.0,7,200.0,5,10,150,40
+"""
+    rows, _ = parse_season_stats_text(text)
+    assert len(rows) == 1
+    assert rows[0]["name"] == "T.Yancey"
+
+
+def test_parse_accepts_bare_section_header_without_team_prefix():
+    text = """RUSHING
+NAME,POS,GP,CAR,YARDS,AVG,TD,AVG G,20+,BTK,YAC,LONG
+J.Doe,HB,1,10,55,5.5,1,55.0,1,2,20,15
+"""
+    rows, warnings = parse_season_stats_text(text)
+    assert len(rows) == 1
+    assert rows[0]["rush_yds"] == 55
+    assert warnings == []
+
+
+def test_parse_handles_defensive_alias_and_ff_fr():
+    text = """OPP - DEFENSIVE
+NAME,POS,GP,SOLO,ASSISTS,TAK,TFL,SACK,INT,INT.YDS,INT.AVG,INT.L,FF,FR
+J.Hit,LB,2,10,3,13,2,1.5,1,12,12.0,12,2,1
+"""
+    rows, warnings = parse_season_stats_text(text)
+    assert warnings == []
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["category"] == "defense"
+    assert row["tackles"] == 13
+    assert row["sacks"] == 1.5
+    assert row["ff"] == 2
+    assert row["fr"] == 1
+
+
+def test_parse_strips_thousands_separators_in_yards():
+    text = """AQUINAS - PASSING
+NAME,POS,GP,COMP,ATT,COMP%,▼YARDS,TD,TD %,INT,INT %,TD:IN
+A.Big,QB,12,300,400,75%,"4,250",30,7.5,5,1.25,6.0
+"""
+    rows, _ = parse_season_stats_text(text)
+    assert rows[0]["pass_yds"] == 4250
+
+
+def test_parse_skips_rows_with_no_stats():
+    """Header-only rows or accidental separator lines should be dropped."""
+    text = """RUSHING
+NAME,POS,GP,CAR,YARDS,AVG,TD,AVG G,20+,BTK,YAC,LONG
+J.Doe,HB,1,10,55,5.5,1,55.0,1,2,20,15
+,,,,,,,,,,,
+"""
+    rows, _ = parse_season_stats_text(text)
+    assert len(rows) == 1
+
+
+def test_parse_normalizes_bom_in_header():
+    text = "﻿RUSHING\nNAME,POS,GP,CAR,YARDS,AVG,TD,AVG G,20+,BTK,YAC,LONG\nJ.Doe,HB,1,5,25,5.0,0,25.0,0,0,0,5\n"
+    rows, _ = parse_season_stats_text(text)
+    assert len(rows) == 1
+    assert rows[0]["rush_att"] == 5
+
+
+def test_parse_handles_alias_columns_in_passing():
+    """CFB sometimes shows YDS instead of YARDS, INTS instead of INT."""
+    text = """OPP - PASSING
+NAME,POS,GP,CMP,ATT,PCT,YDS,TDS,TD %,INTS,INT %,TD:INT
+A.Q,OB,1,20,30,66.7,250,2,6.7,1,3.3,2.0
+"""
+    rows, warnings = parse_season_stats_text(text)
+    assert warnings == []
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["pos"] == "QB"  # OB → QB alias
+    assert row["pass_comp"] == 20
+    assert row["pass_yds"] == 250
+    assert row["pass_int"] == 1
+    assert row["pass_td_int_ratio"] == 2.0

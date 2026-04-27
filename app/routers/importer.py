@@ -12,6 +12,15 @@ from app.importer import (
     parse_season_stats_text,
 )
 from app.models import Dynasty
+from app.vision import (
+    VisionConfigError,
+    VisionExtractionError,
+    extract_roster_csv,
+    extract_season_stats_text,
+)
+
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+MAX_IMAGE_BYTES = 12 * 1024 * 1024  # 12 MB per image — generous for 4K screenshots
 
 router = APIRouter(prefix="/dynasties/{dynasty_id}/import", tags=["import"])
 
@@ -124,6 +133,129 @@ def preview_season_stats(
 
     rows, warnings = parse_season_stats_text(payload.text)
     return {"rows": rows, "warnings": warnings, "count": len(rows)}
+
+
+async def _read_images(files: list[UploadFile]) -> list[tuple[bytes, str]]:
+    if not files:
+        raise HTTPException(400, "At least one image is required")
+    images: list[tuple[bytes, str]] = []
+    for f in files:
+        content_type = (f.content_type or "").lower()
+        if content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(
+                400,
+                f"Unsupported image type '{f.content_type}'. "
+                f"Allowed: {sorted(ALLOWED_IMAGE_TYPES)}",
+            )
+        data = await f.read()
+        if not data:
+            raise HTTPException(400, f"Image '{f.filename}' is empty")
+        if len(data) > MAX_IMAGE_BYTES:
+            raise HTTPException(
+                413, f"Image '{f.filename}' exceeds {MAX_IMAGE_BYTES // (1024 * 1024)} MB limit"
+            )
+        images.append((data, content_type))
+    return images
+
+
+@router.post("/roster/image")
+async def import_roster_image(
+    dynasty_id: int,
+    files: list[UploadFile] = File(...),
+    update_existing: bool = Form(True),
+    dry_run: bool = Form(False),
+    instructions: str | None = Form(None),
+    session: Session = Depends(get_session),
+) -> dict:
+    """
+    Upload one or more screenshots of the in-game roster screen. The image
+    is sent to OpenAI's vision model, which returns canonical MaxPlaysCFB
+    CSV — that CSV is then run through the same importer used for paste/CSV
+    upload, so all the upsert / no-clobber rules still apply.
+
+    Set `dry_run=true` to preview the extracted CSV without writing.
+    """
+    if not session.get(Dynasty, dynasty_id):
+        raise HTTPException(404, "Dynasty not found")
+
+    images = await _read_images(files)
+
+    try:
+        csv_text = extract_roster_csv(images, extra_instructions=instructions)
+    except VisionConfigError as e:
+        raise HTTPException(503, str(e)) from e
+    except VisionExtractionError as e:
+        raise HTTPException(502, str(e)) from e
+
+    csv_text = _strip_preamble(csv_text)
+
+    if dry_run:
+        rows, warnings = parse_roster_csv(csv_text)
+        return {
+            "dry_run": True,
+            "extracted_csv": csv_text,
+            "rows": rows,
+            "warnings": warnings,
+            "count": len(rows),
+        }
+
+    result = import_roster(session, dynasty_id, csv_text, update_existing=update_existing)
+    payload = result.as_dict()
+    payload["extracted_csv"] = csv_text
+    return payload
+
+
+@router.post("/season-stats/image")
+async def import_season_stats_image(
+    dynasty_id: int,
+    files: list[UploadFile] = File(...),
+    season_year: int | None = Form(None),
+    team_name: str | None = Form(None),
+    dry_run: bool = Form(False),
+    instructions: str | None = Form(None),
+    session: Session = Depends(get_session),
+) -> dict:
+    """
+    Upload one or more screenshots of season stat leader screens (rushing,
+    passing, receiving, defense). The vision model converts them into the
+    same text block the existing importer parses.
+    """
+    dynasty = session.get(Dynasty, dynasty_id)
+    if not dynasty:
+        raise HTTPException(404, "Dynasty not found")
+
+    images = await _read_images(files)
+
+    try:
+        text = extract_season_stats_text(
+            images,
+            team_name=team_name,
+            extra_instructions=instructions,
+        )
+    except VisionConfigError as e:
+        raise HTTPException(503, str(e)) from e
+    except VisionExtractionError as e:
+        raise HTTPException(502, str(e)) from e
+
+    if dry_run:
+        rows, warnings = parse_season_stats_text(text)
+        return {
+            "dry_run": True,
+            "extracted_text": text,
+            "rows": rows,
+            "warnings": warnings,
+            "count": len(rows),
+        }
+
+    result = import_season_stats(
+        session,
+        dynasty_id,
+        season_year or dynasty.current_season_year,
+        text,
+    )
+    payload = result.as_dict()
+    payload["extracted_text"] = text
+    return payload
 
 
 def _strip_preamble(text: str) -> str:

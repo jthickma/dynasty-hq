@@ -27,3 +27,4 @@ dist/
 *.egg-info/
 build/
 .eggs/
+.gitnexus

@@ -80,69 +80,145 @@ FIELD_RENAMES = {"str": "strength"}
 # Year cell examples the importer must tolerate:
 # "FR", "SO", "JR", "SR", "FR (RS)", "SO(RS)", "JR (RS)"
 YEAR_RE = re.compile(r"^(FR|SO|JR|SR)\s*(\(RS\))?$", re.IGNORECASE)
+# Section header tolerates: "AQUINAS - RUSHING", "Aquinas-Rushing",
+# bare "RUSHING", "DEFENSIVE" variant, optional trailing "STATS".
 STAT_SECTION_RE = re.compile(
-    r"^\s*(?P<team>.+?)\s*-\s*(?P<section>RUSHING|PASSING|RECEIVING|DEFENSE)\s*$",
+    r"^\s*(?:.+?\s*[-–:]\s*)?"
+    r"(?P<section>RUSHING|PASSING|RECEIVING|DEFENSE|DEFENSIVE)"
+    r"(?:\s+STATS?)?\s*$",
     re.IGNORECASE,
 )
 
+# Header alias → canonical model field. Each section may map several normalized
+# headers to the same field so the parser tolerates CFB 26 layout drift.
 STAT_SECTION_COLUMNS = {
     "rushing": {
         "name": "name",
         "pos": "pos",
         "gp": "games_played",
+        "g": "games_played",
+        "games": "games_played",
         "car": "rush_att",
+        "att": "rush_att",
+        "atts": "rush_att",
+        "rushatt": "rush_att",
         "yards": "rush_yds",
+        "yds": "rush_yds",
+        "rushyds": "rush_yds",
         "avg": "rush_avg",
+        "ypc": "rush_avg",
         "td": "rush_td",
+        "tds": "rush_td",
+        "rushtd": "rush_td",
         "avgg": "rush_yds_per_game",
+        "ypg": "rush_yds_per_game",
         "20plus": "rush_20_plus",
+        "20yds": "rush_20_plus",
         "btk": "rush_broken_tackles",
+        "brk": "rush_broken_tackles",
+        "btks": "rush_broken_tackles",
         "yac": "rush_yac",
         "long": "rush_long",
+        "lng": "rush_long",
     },
     "passing": {
         "name": "name",
         "pos": "pos",
         "gp": "games_played",
+        "g": "games_played",
+        "games": "games_played",
         "comp": "pass_comp",
+        "cmp": "pass_comp",
         "att": "pass_att",
+        "atts": "pass_att",
         "comppct": "pass_pct",
+        "cmppct": "pass_pct",
+        "pct": "pass_pct",
         "yards": "pass_yds",
+        "yds": "pass_yds",
+        "passyds": "pass_yds",
         "td": "pass_td",
+        "tds": "pass_td",
+        "passtd": "pass_td",
         "tdpct": "pass_td_pct",
         "int": "pass_int",
+        "ints": "pass_int",
         "intpct": "pass_int_pct",
         "tdtoin": "pass_td_int_ratio",
+        "tdtoint": "pass_td_int_ratio",
+        "tdint": "pass_td_int_ratio",
+        "tdintratio": "pass_td_int_ratio",
     },
     "receiving": {
         "name": "name",
         "pos": "pos",
         "gp": "games_played",
+        "g": "games_played",
+        "games": "games_played",
         "rec": "receptions",
+        "recs": "receptions",
         "yards": "rec_yds",
+        "yds": "rec_yds",
+        "recyds": "rec_yds",
         "avg": "rec_avg",
+        "ypr": "rec_avg",
         "td": "rec_td",
+        "tds": "rec_td",
+        "rectd": "rec_td",
         "avgg": "rec_yds_per_game",
+        "ypg": "rec_yds_per_game",
         "long": "rec_long",
+        "lng": "rec_long",
         "rac": "rec_rac",
+        "yac": "rec_rac",
         "racavg": "rec_rac_avg",
+        "yacavg": "rec_rac_avg",
         "drop": "rec_drop",
+        "drops": "rec_drop",
     },
     "defense": {
         "name": "name",
         "pos": "pos",
         "gp": "games_played",
+        "g": "games_played",
+        "games": "games_played",
         "solo": "solo_tackles",
+        "solos": "solo_tackles",
         "assists": "assisted_tackles",
+        "ast": "assisted_tackles",
+        "asts": "assisted_tackles",
         "tak": "tackles",
+        "tackles": "tackles",
+        "tkl": "tackles",
+        "tot": "tackles",
+        "total": "tackles",
         "tfl": "tfl",
+        "tfls": "tfl",
         "sack": "sacks",
+        "sacks": "sacks",
+        "sk": "sacks",
         "int": "interceptions",
+        "ints": "interceptions",
         "intyds": "interception_yards",
+        "intyards": "interception_yards",
         "intavg": "interception_avg",
         "intl": "interception_long",
+        "intlong": "interception_long",
+        "intlng": "interception_long",
+        "ff": "ff",
+        "fum": "ff",
+        "fumf": "ff",
+        "fr": "fr",
+        "fumr": "fr",
+        "fumrec": "fr",
     },
 }
+
+# "DEFENSIVE" is just an alias for the defense section.
+SECTION_ALIASES = {"defensive": "defense"}
+
+# Rows whose NAME column matches one of these are aggregate totals — skip them.
+TOTAL_NAMES = {"team", "total", "totals", "teamtotal", "teamtotals"}
 
 STAT_FLOAT_FIELDS = {
     "pass_pct",
@@ -221,21 +297,30 @@ def _to_int(v: Optional[str]) -> Optional[int]:
     s = _clean_cell(v)
     if s is None:
         return None
-    try:
-        # strip anything non-numeric (sometimes OCR leaves stray chars)
-        digits = re.sub(r"[^\d-]", "", s)
-        return int(digits) if digits else None
-    except ValueError:
+    # Parse via float so "5.4", "1,234", and "75%" all behave (float gets
+    # truncated toward zero — matches displayed integer in CFB stat screens).
+    f = _to_float(v)
+    if f is None:
         return None
+    return int(f)
 
 
 def _to_float(v: Optional[str]) -> Optional[float]:
     s = _clean_cell(v)
     if s is None:
         return None
+    # Drop thousands separators, percent signs, stray symbols. Keep digits,
+    # one decimal point, leading minus.
+    cleaned = s.replace(",", "")
+    number = re.sub(r"[^0-9.\-]", "", cleaned)
+    # Guard against multiple dots/dashes from OCR noise.
+    if number.count(".") > 1:
+        head, _, tail = number.partition(".")
+        number = head + "." + tail.replace(".", "")
+    if number in {"", "-", ".", "-."}:
+        return None
     try:
-        number = re.sub(r"[^0-9.\-]", "", s)
-        return float(number) if number else None
+        return float(number)
     except ValueError:
         return None
 
@@ -263,13 +348,24 @@ def _normalize_rs(v: Optional[str]) -> Optional[str]:
 def _normalize_header(h: str) -> str:
     """Strip the header to a lowercase key we can match."""
     s = h.strip().lower()
-    s = s.replace("▼", "")
+    # Strip BOM, NBSP, sort arrows, zero-width chars often pasted from web UI.
+    for ch in ("﻿", " ", "​", "▼", "▲", "↑", "↓"):
+        s = s.replace(ch, "")
     s = s.replace("%", "pct")
     s = s.replace("+", "plus")
     s = s.replace(":", "to")
+    s = s.replace("/", "to")
     s = s.replace(".", "")
     s = s.replace(" ", "")
     return re.sub(r"[^a-z0-9]", "", s)
+
+
+def _normalize_text(text: str) -> str:
+    """Normalize a pasted block: strip BOM, NBSP, normalize newlines."""
+    text = text.replace("﻿", "")
+    text = text.replace(" ", " ")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return text
 
 
 def _normalize_stat_pos(v: Optional[str]) -> Optional[str]:
@@ -298,7 +394,7 @@ def _coerce_stat_value(field: str, value: Optional[str]) -> Optional[int | float
 def parse_season_stats_text(raw_text: str) -> tuple[list[dict], list[str]]:
     warnings: list[str] = []
     rows: list[dict] = []
-    lines = raw_text.splitlines()
+    lines = _normalize_text(raw_text).splitlines()
     i = 0
 
     while i < len(lines):
@@ -308,6 +404,7 @@ def parse_season_stats_text(raw_text: str) -> tuple[list[dict], list[str]]:
             continue
 
         section = match.group("section").lower()
+        section = SECTION_ALIASES.get(section, section)
         section_columns = STAT_SECTION_COLUMNS[section]
         line_no = i + 1
         i += 1
@@ -346,17 +443,38 @@ def parse_season_stats_text(raw_text: str) -> tuple[list[dict], list[str]]:
                 i += 1
                 continue
 
+            # Aggregate / total rows ("TEAM", "TOTAL") leak into pasted blocks.
+            normalized_name = re.sub(r"[^a-z]", "", name.lower())
+            if normalized_name in TOTAL_NAMES:
+                i += 1
+                continue
+
             parsed: dict = {"category": section, "name": name}
             pos = _normalize_stat_pos(row.get("pos"))
             if pos is not None:
                 parsed["pos"] = pos
 
+            # Resolve each header to a field. Multiple headers can map to the
+            # same field (e.g., "att" and "atts") — first non-None wins.
             for header, field in section_columns.items():
                 if field in {"name", "pos"}:
                     continue
                 if header not in row:
                     continue
-                parsed[field] = _coerce_stat_value(field, row.get(header))
+                value = _coerce_stat_value(field, row.get(header))
+                if value is None:
+                    continue
+                if parsed.get(field) is None:
+                    parsed[field] = value
+
+            # Drop rows that have NO real stat data — they're noise lines that
+            # happened to slot under the header (e.g., separator rules).
+            stat_fields_present = any(
+                k for k in parsed if k not in {"category", "name", "pos"}
+            )
+            if not stat_fields_present:
+                i += 1
+                continue
 
             rows.append(parsed)
             i += 1
@@ -480,7 +598,7 @@ def parse_roster_csv(raw_csv: str) -> tuple[list[dict], list[str]]:
     warnings: list[str] = []
 
     # csv.DictReader handles quoted names with commas + periods correctly.
-    reader = csv.reader(io.StringIO(raw_csv.strip()))
+    reader = csv.reader(io.StringIO(_normalize_text(raw_csv).strip()))
     try:
         raw_header = next(reader)
     except StopIteration:
