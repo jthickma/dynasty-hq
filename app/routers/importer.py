@@ -165,6 +165,7 @@ async def import_roster_image(
     update_existing: bool = Form(True),
     dry_run: bool = Form(False),
     instructions: str | None = Form(None),
+    model: str | None = Form(None),
     session: Session = Depends(get_session),
 ) -> dict:
     """
@@ -181,7 +182,7 @@ async def import_roster_image(
     images = await _read_images(files)
 
     try:
-        csv_text = extract_roster_csv(images, extra_instructions=instructions)
+        csv_text = extract_roster_csv(images, extra_instructions=instructions, model=model)
     except VisionConfigError as e:
         raise HTTPException(503, str(e)) from e
     except VisionExtractionError as e:
@@ -213,6 +214,7 @@ async def import_season_stats_image(
     team_name: str | None = Form(None),
     dry_run: bool = Form(False),
     instructions: str | None = Form(None),
+    model: str | None = Form(None),
     session: Session = Depends(get_session),
 ) -> dict:
     """
@@ -231,6 +233,7 @@ async def import_season_stats_image(
             images,
             team_name=team_name,
             extra_instructions=instructions,
+            model=model,
         )
     except VisionConfigError as e:
         raise HTTPException(503, str(e)) from e

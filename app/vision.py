@@ -3,7 +3,10 @@ OpenAI vision-based extraction. Turns CFB 26 roster / season-stats screenshots
 into the canonical text formats the existing importer already understands —
 no new parser path, just OCR + structured prompting.
 
-Env: OPENAI_API_KEY (required), OPENAI_VISION_MODEL (optional, default gpt-4o).
+API key + model resolution order:
+  1. argument passed by caller
+  2. env var (OPENAI_API_KEY / OPENAI_VISION_MODEL) — back-compat
+  3. row in the Setting table written via the /settings router (web UI)
 """
 
 from __future__ import annotations
@@ -12,15 +15,33 @@ import base64
 import json
 import os
 import re
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Optional
 
 import httpx
 
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
-DEFAULT_MODEL = os.environ.get("OPENAI_VISION_MODEL", "gpt-4o")
+from app.settings_store import resolve_openai_api_key, resolve_openai_vision_model
+
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+OPENAI_CHAT_URL = f"{OPENAI_BASE_URL}/chat/completions"
+OPENAI_MODELS_URL = f"{OPENAI_BASE_URL}/models"
+
+DEFAULT_MODEL = "gpt-4o"
 TIMEOUT_SECONDS = float(os.environ.get("OPENAI_VISION_TIMEOUT", "90"))
 
 ExtractMode = Literal["roster", "season_stats"]
+
+# Heuristic prefixes for models that accept image_url input. OpenAI does not
+# return capability metadata via /v1/models, so we filter by naming convention
+# — anything Omni / 4o / 4.1 / o-series can take images. Tweak as needed.
+VISION_MODEL_PREFIXES = (
+    "gpt-4o",
+    "gpt-4.1",
+    "gpt-5",
+    "o1",
+    "o3",
+    "o4",
+    "chatgpt-4o",
+)
 
 
 class VisionConfigError(RuntimeError):
@@ -100,13 +121,18 @@ Rules:
 # ---- HTTP -------------------------------------------------------------------
 
 
-def _api_key() -> str:
-    key = os.environ.get("OPENAI_API_KEY")
+def _resolve_key(api_key: Optional[str]) -> str:
+    key = api_key or resolve_openai_api_key()
     if not key:
         raise VisionConfigError(
-            "OPENAI_API_KEY is not set — image import is disabled until it is configured."
+            "OpenAI API key is not configured. Set it in Settings, or via the "
+            "OPENAI_API_KEY environment variable."
         )
     return key
+
+
+def _resolve_model(model: Optional[str]) -> str:
+    return model or resolve_openai_vision_model(default=DEFAULT_MODEL)
 
 
 def _image_part(image_bytes: bytes, content_type: str) -> dict:
@@ -125,8 +151,9 @@ def _call_openai(
     *,
     system_prompt: str,
     images: Iterable[tuple[bytes, str]],
-    user_hint: str | None = None,
-    model: str | None = None,
+    user_hint: Optional[str] = None,
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> str:
     parts: list[dict] = []
     if user_hint:
@@ -138,7 +165,7 @@ def _call_openai(
         raise VisionExtractionError("At least one image is required for vision extraction.")
 
     body = {
-        "model": model or DEFAULT_MODEL,
+        "model": _resolve_model(model),
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": parts},
@@ -146,12 +173,12 @@ def _call_openai(
         "temperature": 0,
     }
     headers = {
-        "Authorization": f"Bearer {_api_key()}",
+        "Authorization": f"Bearer {_resolve_key(api_key)}",
         "Content-Type": "application/json",
     }
 
     with httpx.Client(timeout=TIMEOUT_SECONDS) as client:
-        resp = client.post(OPENAI_API_URL, headers=headers, json=body)
+        resp = client.post(OPENAI_CHAT_URL, headers=headers, json=body)
 
     if resp.status_code >= 400:
         # Don't leak the API key, but surface model/error context for debugging.
@@ -177,8 +204,9 @@ def _call_openai(
 def extract_roster_csv(
     images: Iterable[tuple[bytes, str]],
     *,
-    extra_instructions: str | None = None,
-    model: str | None = None,
+    extra_instructions: Optional[str] = None,
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> str:
     """Extract MaxPlaysCFB-format roster CSV from one or more screenshots."""
     return _call_openai(
@@ -186,15 +214,17 @@ def extract_roster_csv(
         images=images,
         user_hint=extra_instructions,
         model=model,
+        api_key=api_key,
     )
 
 
 def extract_season_stats_text(
     images: Iterable[tuple[bytes, str]],
     *,
-    team_name: str | None = None,
-    extra_instructions: str | None = None,
-    model: str | None = None,
+    team_name: Optional[str] = None,
+    extra_instructions: Optional[str] = None,
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> str:
     """Extract season-stats block (RUSHING/PASSING/RECEIVING/DEFENSE) from screenshots."""
     hint_parts = []
@@ -207,7 +237,51 @@ def extract_season_stats_text(
         images=images,
         user_hint="\n".join(hint_parts) or None,
         model=model,
+        api_key=api_key,
     )
+
+
+# ---- Model discovery -------------------------------------------------------
+
+
+def list_openai_models(api_key: Optional[str] = None) -> list[dict]:
+    """
+    Hit GET /v1/models. Returns each model dict augmented with a heuristic
+    `vision` boolean so the UI can flag which ones accept image input.
+    """
+    headers = {"Authorization": f"Bearer {_resolve_key(api_key)}"}
+    with httpx.Client(timeout=20.0) as client:
+        resp = client.get(OPENAI_MODELS_URL, headers=headers)
+
+    if resp.status_code >= 400:
+        try:
+            payload = resp.json()
+            err = payload.get("error", {}).get("message") or json.dumps(payload)[:300]
+        except Exception:
+            err = resp.text[:300]
+        raise VisionExtractionError(f"OpenAI /models returned {resp.status_code}: {err}")
+
+    data = resp.json().get("data", [])
+    out: list[dict] = []
+    for m in data:
+        mid = m.get("id", "")
+        out.append(
+            {
+                "id": mid,
+                "created": m.get("created"),
+                "owned_by": m.get("owned_by"),
+                "vision": _is_vision_model(mid),
+            }
+        )
+    out.sort(key=lambda m: (not m["vision"], m["id"]))
+    return out
+
+
+def _is_vision_model(model_id: str) -> bool:
+    mid = model_id.lower()
+    if any(skip in mid for skip in ("audio", "tts", "whisper", "embedding", "moderation", "image")):
+        return False
+    return any(mid.startswith(p) for p in VISION_MODEL_PREFIXES)
 
 
 # ---- Helpers ----------------------------------------------------------------

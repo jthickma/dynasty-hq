@@ -9,6 +9,10 @@ import type {
   RatingLeaders,
   StatLeaders,
   ImportResult,
+  AppSettings,
+  OpenAIModel,
+  ImageImportResult,
+  ImageImportDryRun,
 } from "./types";
 
 const BASE = "";
@@ -209,4 +213,86 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
     return (await res.json()) as ImportResult;
   },
+
+  // image (vision OCR) import
+  importRosterImage: async (
+    dynastyId: number,
+    files: File[],
+    opts: {
+      update_existing?: boolean;
+      dry_run?: boolean;
+      instructions?: string;
+      model?: string;
+    } = {},
+  ) => {
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    fd.append("update_existing", String(opts.update_existing ?? true));
+    fd.append("dry_run", String(opts.dry_run ?? false));
+    if (opts.instructions) fd.append("instructions", opts.instructions);
+    if (opts.model) fd.append("model", opts.model);
+    const res = await fetch(`/dynasties/${dynastyId}/import/roster/image`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try {
+        const j = await res.json();
+        msg = j.detail || JSON.stringify(j);
+      } catch {
+        msg = await res.text();
+      }
+      throw new Error(msg);
+    }
+    return (await res.json()) as ImageImportResult | ImageImportDryRun;
+  },
+  importSeasonStatsImage: async (
+    dynastyId: number,
+    files: File[],
+    opts: {
+      season_year?: number;
+      team_name?: string;
+      dry_run?: boolean;
+      instructions?: string;
+      model?: string;
+    } = {},
+  ) => {
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    if (opts.season_year != null) fd.append("season_year", String(opts.season_year));
+    if (opts.team_name) fd.append("team_name", opts.team_name);
+    fd.append("dry_run", String(opts.dry_run ?? false));
+    if (opts.instructions) fd.append("instructions", opts.instructions);
+    if (opts.model) fd.append("model", opts.model);
+    const res = await fetch(`/dynasties/${dynastyId}/import/season-stats/image`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try {
+        const j = await res.json();
+        msg = j.detail || JSON.stringify(j);
+      } catch {
+        msg = await res.text();
+      }
+      throw new Error(msg);
+    }
+    return (await res.json()) as ImageImportResult | ImageImportDryRun;
+  },
+
+  // settings
+  getSettings: () => req<AppSettings>("/settings"),
+  updateSettings: (patch: { openai_api_key?: string; openai_vision_model?: string }) =>
+    req<AppSettings>("/settings", { method: "PUT", body: JSON.stringify(patch) }),
+  listOpenAIModels: (apiKey?: string) =>
+    req<{ models: OpenAIModel[]; default: string }>(
+      `/settings/openai/models${apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : ""}`,
+    ),
+  testOpenAI: (apiKey?: string) =>
+    req<{ ok: boolean; model_count: number }>(`/settings/openai/test`, {
+      method: "POST",
+      body: JSON.stringify(apiKey ? { api_key: apiKey } : {}),
+    }),
 };

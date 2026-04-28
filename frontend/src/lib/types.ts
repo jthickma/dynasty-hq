@@ -213,3 +213,32 @@ export interface ImportResult {
 
 export const POSITION_GROUPS = ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "ST"] as const;
 export type PositionGroup = (typeof POSITION_GROUPS)[number];
+
+export interface AppSettings {
+  openai_api_key_set: boolean;
+  openai_api_key_source: "env" | "db" | "unset";
+  openai_vision_model: string;
+  openai_vision_model_source: "env" | "db" | "default";
+  default_model: string;
+}
+
+export interface OpenAIModel {
+  id: string;
+  created: number | null;
+  owned_by: string | null;
+  vision: boolean;
+}
+
+export interface ImageImportResult extends ImportResult {
+  extracted_csv?: string;
+  extracted_text?: string;
+}
+
+export interface ImageImportDryRun {
+  dry_run: true;
+  extracted_csv?: string;
+  extracted_text?: string;
+  rows: unknown[];
+  warnings: string[];
+  count: number;
+}

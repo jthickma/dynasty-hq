@@ -8,6 +8,7 @@ import { Recruits } from "./pages/Recruits";
 import { Stats } from "./pages/Stats";
 import { Import } from "./pages/Import";
 import { Dynasties } from "./pages/Dynasties";
+import { Settings } from "./pages/Settings";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/stats" element={<Stats />} />
         <Route path="/import" element={<Import />} />
         <Route path="/dynasties" element={<Dynasties />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

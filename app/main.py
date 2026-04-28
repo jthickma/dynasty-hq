@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.db import init_db
-from app.routers import dynasty, games, importer, players, recruits, stats
+from app.routers import dynasty, games, importer, players, recruits, settings, stats
 
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.include_router(games.router)
 app.include_router(recruits.router)
 app.include_router(stats.router)
 app.include_router(importer.router)
+app.include_router(settings.router)
 
 
 @app.get("/health")
@@ -65,7 +66,7 @@ if _STATIC_DIR.is_dir():
     def spa_fallback(full_path: str):
         # Reserved API prefixes — let FastAPI 404 handle if matched but missed.
         if full_path.startswith(
-            ("dynasties", "seasons", "health", "docs", "openapi.json", "redoc")
+            ("dynasties", "seasons", "settings", "health", "docs", "openapi.json", "redoc")
         ):
             raise HTTPException(status_code=404)
         # Serve real static files (favicon, robots, etc.) if present.

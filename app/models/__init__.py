@@ -232,6 +232,18 @@ class PlayerSeasonStat(SQLModel, table=True):
 # ---------- Recruiting ----------
 
 
+class Setting(SQLModel, table=True):
+    """Singleton key/value store for app-wide config (API keys, model picks, etc).
+
+    Values stored as plain text; SQLite file lives in mounted volume so the
+    OpenAI key is no less secure than the rest of the DB.
+    """
+
+    key: str = Field(primary_key=True)
+    value: Optional[str] = None
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class Recruit(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     dynasty_id: int = Field(foreign_key="dynasty.id", index=True)

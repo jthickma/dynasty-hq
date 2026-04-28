@@ -20,6 +20,7 @@ const NAV = [
   { to: "/stats", label: "Stats", Icon: StatsIcon },
   { to: "/import", label: "Import", Icon: ImportIcon },
   { to: "/dynasties", label: "Dynasties", Icon: SettingsIcon },
+  { to: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
 
 export function Layout() {

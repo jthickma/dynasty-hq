@@ -6,6 +6,7 @@ CFB 26 Dynasty tracker — FastAPI + SQLModel + SQLite backend with a React/Tail
 
 - Stores multi-season dynasty state (rosters, schedules, recruits, game results)
 - Imports roster CSVs directly from Max's screenshot prompt output — preamble stripped, RS icons preserved, `(RS)` year tags kept, unreadable cells left blank
+- **Screenshot OCR via OpenAI vision** — drop in raw roster / season-stats screenshots; the model emits the canonical CSV / text block which is then run through the same importer. API key + model are managed in the Settings page (model list pulled from `/v1/models`). See [docs/vision-ocr.md](docs/vision-ocr.md).
 - Second import updates only cells that are present — never clobbers existing ratings with blanks from a cropped screenshot
 - Auto-rolls season W-L / conference record when games are logged
 - Rating leaders, stat leaders, roster summary by position group and class year
@@ -87,6 +88,8 @@ All endpoints return JSON. Interactive docs at `/docs`.
 | POST | `/dynasties/{id}/import/roster/text` | Paste Max's CSV output (preamble auto-stripped) |
 | POST | `/dynasties/{id}/import/roster/file` | Upload CSV file |
 | POST | `/dynasties/{id}/import/roster/preview` | Dry-run — returns parsed rows + warnings, writes nothing |
+| POST | `/dynasties/{id}/import/roster/image` | Multipart upload of screenshots; OpenAI vision extracts CSV then imports |
+| POST | `/dynasties/{id}/import/season-stats/image` | Same idea for season-stats leader screens |
 
 Request body for `text` / `preview`:
 ```json
@@ -173,3 +176,6 @@ The active dynasty is stored in `localStorage`. The dynasty's `accent_color` dri
 - `DYNASTY_DB_PATH` — SQLite file path, default `/data/dynasty.db`
 - `DYNASTY_STATIC_DIR` — frontend dist path, default `/app/static` (Docker) or `./frontend/dist` (local fallback)
 - `TZ` — timezone for timestamps
+- `OPENAI_API_KEY` — optional; takes precedence over the value saved via the Settings page
+- `OPENAI_VISION_MODEL` — optional; same precedence rule, default `gpt-4o`
+- `OPENAI_VISION_TIMEOUT` — optional; per-request timeout in seconds, default `90`
