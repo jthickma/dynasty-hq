@@ -3,7 +3,7 @@
 ## Dude is a pillar of this community.
 ## I know zero about coding, security practices, audit this code at your discretion. There shouldn't really be a major attack surface if you run locally. You should only run this locally. Very willing to accept PRs and any changes. For the OCR, the API key used should belong to its own separate project in the openai platform, and should have a strict, <$1 usage limit. I make no promises about application security, so do not risk your main API keys with unlimited usage. 
 
-A self-hosted CFB 26 dynasty tracker. FastAPI + SQLModel + SQLite backend with a React/Tailwind SPA, bundled into one container or runnable directly with `uv` + `npm`. Built around the [MaxPlaysCFB](https://www.reddit.com/r/NCAAFBseries/) roster screenshot prompt — paste the CSV (or drop the screenshot in directly via OpenAI vision) and the importer takes care of the rest.
+A self-hosted CFB 26 dynasty tracker. FastAPI + SQLModel + SQLite backend with a React/Tailwind SPA, bundled into one container or runnable directly with `uv` + `npm`. Built around the [MaxPlaysCFB](https://www.maxplayscfb.com/) roster screenshot prompt — paste the CSV (or drop the screenshot in directly via OpenAI vision) and the importer takes care of the rest.
 
 > Status: pre-release / community preview. Built for personal homelab use, hardened for sharing. PRs welcome.
 
