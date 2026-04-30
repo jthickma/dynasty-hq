@@ -1,0 +1,65 @@
+name: Build Platform Binaries
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Build binary (Unix)
+        if: runner.os != 'Windows'
+        run: ./scripts/build-binary.sh
+
+      - name: Build binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          uv run pyinstaller --name dynasty-hq --onefile --collect-all uvicorn --collect-all sqlmodel --hidden-import=pydantic -m app
+
+      - name: Package artifact (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd dist
+          tar -czf dynasty-hq-${{ runner.os }}.tar.gz dynasty-hq
+
+      - name: Package artifact (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Compress-Archive -Path dist/dynasty-hq.exe -DestinationPath dist/dynasty-hq-Windows.zip
+
+      - name: Upload artifact (Unix)
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynasty-hq-${{ runner.os }}
+          path: dist/dynasty-hq-${{ runner.os }}.tar.gz
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynasty-hq-Windows
+          path: dist/dynasty-hq-Windows.zip
