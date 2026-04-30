@@ -56,6 +56,9 @@ def get_player(dynasty_id: int, player_id: int, session: Session = Depends(get_s
     return p
 
 
+_PLAYER_PROTECTED = {"id", "dynasty_id"}
+
+
 @router.patch("/{player_id}", response_model=PlayerRead)
 def update_player(
     dynasty_id: int,
@@ -67,8 +70,9 @@ def update_player(
     if not p or p.dynasty_id != dynasty_id:
         raise HTTPException(404, "Player not found")
     for k, v in patch.items():
-        if hasattr(p, k):
-            setattr(p, k, v)
+        if k in _PLAYER_PROTECTED or not hasattr(p, k):
+            continue
+        setattr(p, k, v)
     session.add(p)
     session.commit()
     session.refresh(p)
@@ -132,8 +136,9 @@ def update_player_stat(
         raise HTTPException(404, "Season stat not found")
 
     for k, v in patch.items():
-        if k not in {"id", "player_id"} and hasattr(stat, k):
-            setattr(stat, k, v)
+        if k in {"id", "player_id"} or not hasattr(stat, k):
+            continue
+        setattr(stat, k, v)
     session.add(stat)
     session.commit()
     session.refresh(stat)

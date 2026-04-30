@@ -20,15 +20,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-RUN uv pip install --system --no-cache \
-    "fastapi>=0.115.0" \
-    "uvicorn[standard]>=0.32.0" \
-    "sqlmodel>=0.0.22" \
-    "pydantic>=2.9.0" \
-    "python-multipart>=0.0.12"
-
+COPY pyproject.toml uv.lock* ./
 COPY app ./app
+RUN uv pip install --system --no-cache .
 COPY --from=frontend /frontend/dist ./static
 
 RUN mkdir -p /data

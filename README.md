@@ -3,333 +3,335 @@
 ## Dude is a pillar of this community.
 ## I know zero about coding, security practices, audit this code at your discretion. There shouldn't really be a major attack surface if you run locally. You should only run this locally. Very willing to accept PRs and any changes. For the OCR, the API key used should belong to its own separate project in the openai platform, and should have a strict, <$1 usage limit. I make no promises about application security, so do not risk your main API keys with unlimited usage. 
 
-CFB 26 Dynasty tracker — FastAPI + SQLModel + SQLite backend with a React/Tailwind SPA frontend bundled into the same container. 
+A self-hosted CFB 26 dynasty tracker. FastAPI + SQLModel + SQLite backend with a React/Tailwind SPA, bundled into one container or runnable directly with `uv` + `npm`. Built around the [MaxPlaysCFB](https://www.reddit.com/r/NCAAFBseries/) roster screenshot prompt — paste the CSV (or drop the screenshot in directly via OpenAI vision) and the importer takes care of the rest.
 
-## What it does
+> Status: pre-release / community preview. Built for personal homelab use, hardened for sharing. PRs welcome.
 
-- Stores multi-season dynasty state (rosters, schedules, recruits, game results)
-- Imports roster CSVs directly from Roster screenshot
-- **Screenshot OCR via OpenAI vision** — drop in raw roster / season-stats screenshots; the model emits the canonical CSV / text block which is then run through the same importer. API key + model are managed in the Settings page (model list pulled from `/v1/models`). See [docs/vision-ocr.md](docs/vision-ocr.md).
-- Second import updates only cells that are present — never clobbers existing ratings with blanks from a cropped screenshot
-- Auto-rolls season W-L / conference record when games are logged
-- Rating leaders, stat leaders, roster summary by position group and class year
-- Recruiting board with weekly hours budget tracker
+---
 
-## Running Dynasty HQ
+## Features
 
-Dynasty HQ supports two normal run modes:
+- **Multi-season dynasty state** — rosters, schedules, recruits, per-game and per-season stats
+- **MaxPlaysCFB-compatible roster import** — paste the CSV (with the "Here are your results!" preamble) or upload the file. Preamble auto-stripped, RS icons preserved, `(RS)` year tags kept, unreadable cells left blank
+- **Screenshot OCR via OpenAI vision** — drop in raw roster / season-stat screenshots; the model emits canonical CSV / text which is fed into the same importer. API key + model are managed in the **Settings** page (model list pulled from `/v1/models`). Details: [docs/vision-ocr.md](docs/vision-ocr.md)
+- **Non-destructive upserts** — repeat imports update only the cells that are present, never clobbering ratings with blanks from a cropped screenshot. Match key: `(dynasty, name, position)`
+- **Auto-rolling W-L records** — log a game's score and the parent season's wins / losses / conference record recompute automatically
+- **Rating + stat leaders** — top N by OVR overall and per position group, plus per-category statistical leaders for any season
+- **Recruiting board** — interest, hours-spent, weekly hours-budget tracker, commitment status
+- **Mobile-first SPA** — sidebar collapses to a bottom nav under 768px; works one-handed in the browser
+- **Single origin** — FastAPI serves both API and Web UI, so there's no CORS dance for self-hosters
 
-- **Docker Compose** — production / homelab mode. The image builds the React SPA, runs FastAPI with Uvicorn, stores SQLite data in `./data`, and exposes the combined API + Web UI on port `8000`.
-- **uv without Docker** — local machine mode. You build the SPA once with `npm`, then run the same FastAPI app with `uv`. The recommended command binds to `0.0.0.0`, so the Web UI is available across your LAN by default instead of only on localhost.
+---
 
-In both modes, FastAPI serves the frontend and backend from the same origin:
+## Quick start
 
-- Web UI: `/`
-- API docs: `/docs`
-- Health check: `/health`
-- API routes: `/dynasties`, `/seasons`, `/settings`, and related nested routes
+Pick whichever path fits.
 
-### Run Locally With uv
+### Option A — Local dev (`uv` + `npm`)
 
-Use this when you want to run the app directly on your Mac or Linux machine without Docker.
+For running on your laptop, sharing across the LAN, or hacking on the code.
 
-Prerequisites:
+**Prerequisites:** Python 3.12, [`uv`](https://docs.astral.sh/uv/), Node.js 20+, `npm`.
 
-- Python `3.12`
-- `uv`
-- Node.js `20` or newer
-- `npm`
+```bash
+# 1. Clone
+git clone https://github.com/<you>/dynasty-hq.git
+cd dynasty-hq
 
-Install the backend dependencies:
+# 2. Backend deps (creates .venv automatically)
+uv sync
 
-```zsh
-cd /Users/jacksonhickman/dynasty-hq
-uv venv
-uv pip install -e ".[dev]"
-```
+# 3. Build the frontend (one-time, or after frontend changes)
+cd frontend && npm install && npm run build && cd ..
 
-Install and build the frontend:
-
-```zsh
-cd /Users/jacksonhickman/dynasty-hq/frontend
-npm install
-npm run build
-```
-
-Run the combined Web UI + API server:
-
-```zsh
-cd /Users/jacksonhickman/dynasty-hq
+# 4. Run — API + UI on a single port, reachable across your LAN
 mkdir -p data
 DYNASTY_DB_PATH="$PWD/data/dynasty.db" \
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+  uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Open it on the same machine:
+Then open:
 
-```text
-http://localhost:8000
+- Same machine: http://localhost:8000
+- LAN device: `http://<server-lan-ip>:8000`
+- API docs: http://localhost:8000/docs
+- Health: http://localhost:8000/health
+
+`--host 0.0.0.0` is intentional. Uvicorn defaults to localhost-only, which blocks phones / tablets / other LAN devices. If you only want it on this machine, drop the `--host` flag.
+
+> Don't have `uv` yet? `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS / Linux) or see the [install docs](https://docs.astral.sh/uv/getting-started/installation/).
+
+#### Find your LAN IP
+
+```bash
+# macOS Wi-Fi
+ipconfig getifaddr en0   # try en1 if blank
+# Linux
+hostname -I | awk '{print $1}'
 ```
 
-Open it from another device on the same LAN:
+#### LAN device can't connect?
 
-```text
-http://<server-lan-ip>:8000
-```
+- Server still running? (check the terminal)
+- Same Wi-Fi / VLAN as the server?
+- Firewall — macOS may prompt to allow incoming connections for Python; allow it
+- Sanity-check: `http://<server-lan-ip>:8000/health` should return `{"status":"ok"}`
 
-On macOS, find the Wi-Fi LAN IP with:
+### Option B — Hot-reload dev mode
 
-```zsh
-ipconfig getifaddr en0
-```
+Two terminals, Vite hot reload on the frontend, auto-reload on the backend.
 
-If `en0` returns nothing, try:
-
-```zsh
-ipconfig getifaddr en1
-```
-
-The important part is `--host 0.0.0.0`. Uvicorn's default host is localhost-only, which prevents phones, tablets, or other computers on the LAN from reaching the Web UI. The command above intentionally makes the app listen on all network interfaces.
-
-If a LAN device cannot connect:
-
-- Confirm the server is still running.
-- Confirm the LAN IP is correct.
-- Confirm the device is on the same network.
-- Allow incoming connections for Python/Uvicorn in the local firewall if macOS prompts for it.
-- Try `http://<server-lan-ip>:8000/health`; it should return `{"status":"ok"}`.
-
-### uv Development Mode
-
-For day-to-day frontend work, run the backend and Vite dev server separately. This gives you Vite hot reload while the backend still listens on the LAN.
-
-Terminal 1:
-
-```zsh
-cd /Users/jacksonhickman/dynasty-hq
+```bash
+# Terminal 1 — backend
 mkdir -p data
 DYNASTY_DB_PATH="$PWD/data/dynasty.db" \
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+  uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-Terminal 2:
-
-```zsh
-cd /Users/jacksonhickman/dynasty-hq/frontend
-npm install
+# Terminal 2 — Vite dev server
+cd frontend
+npm install   # first run only
 npm run dev -- --host 0.0.0.0
 ```
 
-Open Vite locally:
+Vite serves the SPA at http://localhost:5173 (or `http://<lan-ip>:5173`) and proxies `/dynasties`, `/seasons`, `/settings`, `/health`, and `/docs` to the backend on port 8000 — no `VITE_API_BASE` needed.
 
-```text
-http://localhost:5173
-```
+### Option C — Docker Compose (production / homelab)
 
-Open Vite from another LAN device:
+Single container. Builds the SPA, runs FastAPI, persists SQLite to `./data` outside the image.
 
-```text
-http://<server-lan-ip>:5173
-```
-
-The Vite dev server proxies API calls for `/dynasties`, `/seasons`, and `/health` to `http://localhost:8000`, so the frontend can call the backend without a separate API base URL.
-
-### Docker Compose
-
-Use this for the homelab deployment or any machine where you want a single containerized service.
-
-```zsh
-mkdir -p /opt/stacks/dynasty-hq
-cd /opt/stacks/dynasty-hq
-# copy project files here with git clone, scp, or rsync
+```bash
+git clone https://github.com/<you>/dynasty-hq.git
+cd dynasty-hq
 mkdir -p data
 docker compose up -d --build
 ```
 
-The Docker image:
+Web UI at http://localhost:8000 — same routes as Option A. The container:
 
-- Builds the React frontend in a Node stage.
-- Copies `frontend/dist` into the runtime image at `/app/static`.
-- Runs Uvicorn with `--host 0.0.0.0 --port 8000`.
-- Uses `DYNASTY_DB_PATH=/data/dynasty.db`.
-- Mounts host `./data` to container `/data`, so the SQLite database survives rebuilds.
+- Stages the frontend build from `node:20-alpine`
+- Installs Python deps from `pyproject.toml` via `uv pip install`
+- Mounts host `./data` to `/data` so the database survives rebuilds
+- Sets `DYNASTY_DB_PATH=/data/dynasty.db` and `DYNASTY_STATIC_DIR=/app/static`
 
-GoDoxy discovers the service through the labels in `compose.yml`; the homelab instance is available at:
+Useful commands:
 
-```text
-https://dynasty.jickman.cc
+```bash
+docker compose up -d --build       # build + start
+docker compose logs -f dynasty-hq  # follow logs
+docker compose ps                  # status
+docker compose restart dynasty-hq  # restart
+docker compose down                # stop + remove (data preserved)
 ```
 
-Useful Docker commands:
+> The bundled `compose.yml` includes labels for [GoDoxy](https://github.com/yusing/go-proxy) auto-discovery. Strip them if you use a different reverse proxy — they're harmless if ignored.
 
-```zsh
-docker compose up -d --build              # build and start
-docker compose logs -f dynasty-hq         # follow logs
-docker compose ps                         # show container status
-docker compose restart dynasty-hq         # restart app
-docker compose down                       # stop and remove container
-```
+---
 
-After code changes, rebuild the image:
-
-```zsh
-docker compose up -d --build
-```
-
-Do not delete `./data` unless you intentionally want to remove the local SQLite database.
-
-### Tests And Checks
-
-Run the backend test suite:
-
-```zsh
-cd /Users/jacksonhickman/dynasty-hq
-uv run pytest
-```
-
-Run a single importer test:
-
-```zsh
-uv run pytest tests/test_importer.py::test_name -x
-```
-
-Run lint and formatting:
-
-```zsh
-uv run ruff check .
-uv run ruff format .
-```
-
-Build the frontend:
-
-```zsh
-cd /Users/jacksonhickman/dynasty-hq/frontend
-npm run build
-```
-
-## Data flow
+## How import works
 
 ```
 iPhone screenshot
-    ↓
-Claude + Max's roster prompt (your existing prompt)
-    ↓
-CSV block pasted into mobile app
-    ↓
-POST /dynasties/{id}/import/roster/text
-    ↓
-SQLite @ /data/dynasty.db
+    │
+    ├─── Claude / GPT vision → CSV  (OR Max's roster prompt → paste CSV)
+    │
+    ▼
+POST /dynasties/{id}/import/roster/{text|file|image}
+    │
+    ▼
+SQLite @ $DYNASTY_DB_PATH
 ```
 
-## API
+Three import paths, all converging on the same parser + upsert rules:
 
-All endpoints return JSON. Interactive docs at `/docs`.
+| Path | Endpoint | Use when |
+|---|---|---|
+| Paste | `POST /dynasties/{id}/import/roster/text` | You have CSV text (Max's prompt, hand-edited, etc.) |
+| File | `POST /dynasties/{id}/import/roster/file` | You have a `.csv` file |
+| Image | `POST /dynasties/{id}/import/roster/image` | You only have a screenshot — uses OpenAI vision OCR |
+
+`/preview` variants exist for paste and image — they parse and return rows + warnings without writing anything. Set `dry_run=true` on `/image` for the same.
+
+### Importer rules
+
+- **Match key**: `(dynasty_id, name, pos)`
+- **Never clobber real values with blanks** — a cropped screenshot won't erase ratings from a previous import
+- **Core columns required**: `RS, NAME, YEAR, POS, OVR, SPD, ACC, AGI, COD, STR, AWR, CAR, BCV`
+- **Extended columns auto-detected** from the header (anything from `JMP` to `PRS`)
+- **`STR` → `strength`** in the model (Python builtin clash)
+- **All ratings nullable** — NULL means "not observed", never zero
+- **Names with periods / commas** parsed correctly via real CSV quoting (`"T.J. O'Neil"`, `"Smith, Jr."`)
+
+---
+
+## API reference
+
+JSON in, JSON out. Interactive docs at `/docs`, OpenAPI schema at `/openapi.json`.
 
 ### Dynasty
+
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/dynasties` | Create dynasty + season 0 |
-| GET | `/dynasties` | List all |
-| GET | `/dynasties/{id}` | Get one |
-| PATCH | `/dynasties/{id}` | Partial update |
-| DELETE | `/dynasties/{id}` | Cascade delete |
-| GET | `/dynasties/{id}/seasons` | List seasons |
-| POST | `/dynasties/{id}/seasons` | Add season |
+| `POST` | `/dynasties` | Create dynasty + season 0 |
+| `GET` | `/dynasties` | List all |
+| `GET` | `/dynasties/{id}` | Get one |
+| `PATCH` | `/dynasties/{id}` | Partial update |
+| `DELETE` | `/dynasties/{id}` | Cascade delete |
+| `GET` | `/dynasties/{id}/seasons` | List seasons |
+| `POST` | `/dynasties/{id}/seasons` | Add season |
 
 ### Import
+
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/dynasties/{id}/import/roster/text` | Paste Max's CSV output (preamble auto-stripped) |
-| POST | `/dynasties/{id}/import/roster/file` | Upload CSV file |
-| POST | `/dynasties/{id}/import/roster/preview` | Dry-run — returns parsed rows + warnings, writes nothing |
-| POST | `/dynasties/{id}/import/roster/image` | Multipart upload of screenshots; OpenAI vision extracts CSV then imports |
-| POST | `/dynasties/{id}/import/season-stats/image` | Same idea for season-stats leader screens |
+| `POST` | `/dynasties/{id}/import/roster/text` | Paste CSV (preamble auto-stripped) |
+| `POST` | `/dynasties/{id}/import/roster/file` | Upload CSV file |
+| `POST` | `/dynasties/{id}/import/roster/preview` | Dry run — parsed rows + warnings, no writes |
+| `POST` | `/dynasties/{id}/import/roster/image` | Multipart screenshots → vision OCR → import |
+| `POST` | `/dynasties/{id}/import/season-stats/text` | Paste season-stats block |
+| `POST` | `/dynasties/{id}/import/season-stats/file` | Upload season-stats text file |
+| `POST` | `/dynasties/{id}/import/season-stats/preview` | Dry run for stats |
+| `POST` | `/dynasties/{id}/import/season-stats/image` | Screenshots → vision OCR → import |
 
-Request body for `text` / `preview`:
+Roster paste body:
+
 ```json
 { "csv": "RS,NAME,YEAR,POS,OVR,...", "update_existing": true }
 ```
 
 Response:
+
 ```json
 { "created": 4, "updated": 0, "skipped": 0, "errors": [], "total_rows": 4 }
 ```
 
 ### Players
+
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/dynasties/{id}/players` | List; query params: `pos_group`, `pos`, `year`, `min_ovr`, `search` |
-| GET | `/dynasties/{id}/players/{pid}` | Detail |
-| PATCH | `/dynasties/{id}/players/{pid}` | Partial update (dev_trait, jersey, archetype, etc.) |
-| DELETE | `/dynasties/{id}/players/{pid}` | Remove |
-| GET | `/dynasties/{id}/players/{pid}/stats` | Career season stats |
-| POST | `/dynasties/{id}/players/{pid}/stats` | Add season stat line |
+| `GET` | `/dynasties/{id}/players` | List; filters: `pos_group`, `pos`, `year`, `min_ovr`, `search` |
+| `GET` | `/dynasties/{id}/players/{pid}` | Detail |
+| `PATCH` | `/dynasties/{id}/players/{pid}` | Partial update (dev_trait, jersey, archetype, …) |
+| `DELETE` | `/dynasties/{id}/players/{pid}` | Remove |
+| `GET` | `/dynasties/{id}/players/{pid}/stats` | Career season stats |
+| `POST` | `/dynasties/{id}/players/{pid}/stats` | Add season stat line |
+| `PATCH` | `/dynasties/{id}/players/{pid}/stats/{sid}` | Update one season's stats |
+| `DELETE` | `/dynasties/{id}/players/{pid}/stats/{sid}` | Remove |
 
-`pos_group` values: `QB`, `RB`, `WR`, `TE`, `OL`, `DL`, `LB`, `DB`, `ST`.
+`pos_group` values: `QB, RB, WR, TE, OL, DL, LB, DB, ST`.
 
 ### Games
+
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/seasons/{sid}/games` | List schedule |
-| POST | `/seasons/{sid}/games` | Add game |
-| PATCH | `/seasons/{sid}/games/{gid}` | Log result (auto-rolls season record) |
-| DELETE | `/seasons/{sid}/games/{gid}` | Remove |
+| `GET` | `/seasons/{sid}/games` | Schedule |
+| `POST` | `/seasons/{sid}/games` | Add game |
+| `PATCH` | `/seasons/{sid}/games/{gid}` | Log result (auto-rolls season W-L + conference record) |
+| `DELETE` | `/seasons/{sid}/games/{gid}` | Remove |
 
-Setting `team_score` + `opp_score` on a game auto-derives `played=true` and `result=W/L`, then recomputes the parent season's W-L / conference record.
+Setting `team_score` + `opp_score` derives `played=true` and `result=W/L`, then recomputes the parent season's record.
 
 ### Recruits
+
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/dynasties/{id}/recruits` | List; filters: `pos`, `committed`, `min_stars` |
-| POST | `/dynasties/{id}/recruits` | Add target |
-| PATCH | `/dynasties/{id}/recruits/{rid}` | Update (hours, interest, commit status) |
-| DELETE | `/dynasties/{id}/recruits/{rid}` | Remove |
-| GET | `/dynasties/{id}/recruits/budget/weekly?cap=50` | Weekly hours budget tracker |
+| `GET` | `/dynasties/{id}/recruits` | List; filters: `pos`, `committed`, `min_stars` |
+| `POST` | `/dynasties/{id}/recruits` | Add target |
+| `PATCH` | `/dynasties/{id}/recruits/{rid}` | Update (hours, interest, commit status) |
+| `DELETE` | `/dynasties/{id}/recruits/{rid}` | Remove |
+| `GET` | `/dynasties/{id}/recruits/budget/weekly?cap=50` | Weekly hours budget tracker |
 
 ### Stats
+
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/dynasties/{id}/stats/roster/summary` | Counts by pos group, class year, dev trait + avg OVR |
-| GET | `/dynasties/{id}/stats/leaders/ratings?limit=10` | Top N by OVR overall + per position group |
-| GET | `/dynasties/{id}/stats/leaders/stats?season_year=2026` | Stat category leaders for a given season |
+| `GET` | `/dynasties/{id}/stats/roster/summary` | Counts by pos group, class year, dev trait + avg OVR |
+| `GET` | `/dynasties/{id}/stats/leaders/ratings?limit=10` | Top N by OVR overall + per group |
+| `GET` | `/dynasties/{id}/stats/leaders/stats?season_year=2026` | Stat category leaders |
 
-## CSV import rules (matching Max's prompt)
+### Settings
 
-- **RS column** — only populated when the far-left redshirt icon column is visible. `yes` → active RS. Blank = not active or column cropped.
-- **YEAR** — kept as-is including `(RS)` suffix. Parsed into `FR`, `SO`, `JR`, `SR` with optional `(RS)` marker.
-- **Names with periods** — `T.J. O'Neil`, `A.J. Green` parsed correctly via real CSV quoting, not split on the period.
-- **Blank cells** — left as NULL in the DB, never 0. A cropped BCV from one screenshot won't erase an earlier full row.
-- **Extended columns** — JMP through PRS auto-detected from header; anything beyond BCV only imported if present in the header row.
-- **Preamble line** — "Here are your results! ..." line from Max's prompt is stripped automatically before parsing.
-- **Match key** — (dynasty_id, name, pos). Second import updates in place, only overwriting columns that have real values.
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/settings` | Whether OpenAI key is set + which source (env / db / unset) |
+| `PUT` | `/settings` | Save OpenAI API key + vision model |
+| `GET` | `/settings/openai/models` | Proxy to OpenAI `/v1/models`, flagged with vision-capable hint |
+| `POST` | `/settings/openai/test` | Connectivity check for the saved (or supplied) key |
+
+The API key is write-only over the wire — `GET /settings` never returns the plaintext value.
+
+---
+
+## Configuration
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `DYNASTY_DB_PATH` | `/data/dynasty.db` | SQLite file path |
+| `DYNASTY_STATIC_DIR` | `/app/static` (Docker), `./frontend/dist` (local fallback) | SPA build directory |
+| `OPENAI_API_KEY` | unset | Optional — takes precedence over the key saved in Settings |
+| `OPENAI_VISION_MODEL` | `gpt-4o` | Optional — same precedence rule |
+| `OPENAI_VISION_TIMEOUT` | `90` | Per-request timeout (seconds) |
+| `TZ` | system | Timezone for timestamps |
+
+Env vars always win over DB-stored values, so existing self-hosters can keep their setups. New users can configure everything from the Settings page in the Web UI — no shell access required.
+
+---
 
 ## Schema
 
-Core tables:
+Core tables, all in [app/models/__init__.py](app/models/__init__.py):
+
 - `dynasty` — top-level container
 - `season` — one per year per dynasty, holds W-L record
-- `game` — schedule + per-game result / team stats / quarterly scoring
-- `player` — 54 rating columns + bio, unique per (dynasty, name, pos)
+- `game` — schedule + per-game result, team stats, quarterly scoring
+- `player` — 54 rating columns + bio, unique per `(dynasty, name, pos)`
 - `player_season_stat` — per-season stat lines for the progression graph
-- `recruit` — recruiting board targets with interest level + weekly hours
+- `recruit` — recruiting board entries with interest level + weekly hours
+- `setting` — singleton key/value store (API key, vision model)
 
-All ratings nullable — a missing value means "not observed yet", not zero.
+All ratings are nullable — a missing value means "not observed yet", never zero.
 
-## Frontend
+> No migrations yet. Schema changes require manual ALTER or a wipe of `data/dynasty.db`. If you're contributing a schema change, call it out clearly in the PR.
 
-React 18 + TypeScript + Vite + Tailwind + TanStack Query. Single SPA bundled to `frontend/dist/`, served as static files by FastAPI.
+---
 
-Pages: Dashboard, Roster (filter/search), Player detail (full ratings + season stats), Schedule (per-season games, score entry auto-rolls W-L), Recruits (board + weekly hours budget), Stats (rating + stat leaders), Import (paste CSV / file upload), Dynasties (manage and switch).
+## Tests + checks
 
-Mobile-first: sidebar collapses to a bottom nav under 768px; everything works one-handed.
+```bash
+uv run pytest                                          # full suite
+uv run pytest tests/test_importer.py::test_name -x     # single test
+uv run ruff check .                                    # lint
+uv run ruff format .                                   # format
+cd frontend && npm run build                           # type-check + build SPA
+```
 
-The active dynasty is stored in `localStorage`. The dynasty's `accent_color` drives the UI accent via a CSS variable.
+CI hasn't shipped yet. Until then, run the four commands above before opening a PR.
 
-## Env vars
+---
 
-- `DYNASTY_DB_PATH` — SQLite file path, default `/data/dynasty.db`
-- `DYNASTY_STATIC_DIR` — frontend dist path, default `/app/static` (Docker) or `./frontend/dist` (local fallback)
-- `TZ` — timezone for timestamps
-- `OPENAI_API_KEY` — optional; takes precedence over the value saved via the Settings page
-- `OPENAI_VISION_MODEL` — optional; same precedence rule, default `gpt-4o`
-- `OPENAI_VISION_TIMEOUT` — optional; per-request timeout in seconds, default `90`
+## Frontend stack
+
+React 18 + TypeScript + Vite + Tailwind + TanStack Query. Single SPA bundled to `frontend/dist/`, served as static files by FastAPI in production.
+
+Pages: Dashboard, Roster (filter / search), Player detail (full ratings + season stats), Schedule (per-season games, score entry auto-rolls W-L), Recruits (board + weekly hours budget), Stats (rating + stat leaders), Import (paste / file / image), Settings (OpenAI key + model picker), Dynasties (manage + switch).
+
+The active dynasty lives in `localStorage`. The dynasty's `accent_color` drives the UI accent via a CSS variable.
+
+---
+
+## Contributing
+
+PRs welcome — bug fixes, new features, docs, examples. Before opening a PR:
+
+1. `uv run pytest` passes
+2. `uv run ruff check .` is clean
+3. `cd frontend && npm run build` succeeds
+4. New backend behavior has a test in `tests/`
+5. If the schema changes, note it in the PR (no migrations yet)
+
+Issues / discussion: please use GitHub issues. For bugs, include the dynasty action you took, the request payload (if relevant), and the response or error.
+
+---
+
+## License
+
+TBD — pending release.

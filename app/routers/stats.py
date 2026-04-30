@@ -97,24 +97,28 @@ def roster_summary(
     """Counts by position group and class year."""
     all_players = session.exec(select(Player).where(Player.dynasty_id == dynasty_id)).all()
 
+    pos_to_group = {pos: group for group, positions in POSITION_GROUPS.items() for pos in positions}
     by_group = {g: 0 for g in POSITION_GROUPS}
     by_year = {"FR": 0, "SO": 0, "JR": 0, "SR": 0, "UNK": 0}
     dev_traits = {"Elite": 0, "Star": 0, "Impact": 0, "Normal": 0, "UNK": 0}
 
+    ovr_sum = 0
+    ovr_count = 0
     for p in all_players:
-        for group, positions in POSITION_GROUPS.items():
-            if p.pos in positions:
-                by_group[group] += 1
-                break
-        year_key = (p.year or "UNK").split(" ")[0]
+        group = pos_to_group.get(p.pos)
+        if group:
+            by_group[group] += 1
+        year_key = (p.year or "UNK").split(" ", 1)[0]
         by_year[year_key if year_key in by_year else "UNK"] += 1
         trait = p.dev_trait or "UNK"
         dev_traits[trait if trait in dev_traits else "UNK"] += 1
+        if p.ovr is not None:
+            ovr_sum += p.ovr
+            ovr_count += 1
 
-    avg_ovr = [p.ovr for p in all_players if p.ovr is not None]
     return {
         "total_players": len(all_players),
-        "avg_ovr": round(sum(avg_ovr) / len(avg_ovr), 1) if avg_ovr else 0,
+        "avg_ovr": round(ovr_sum / ovr_count, 1) if ovr_count else 0,
         "by_position_group": by_group,
         "by_year": by_year,
         "by_dev_trait": dev_traits,

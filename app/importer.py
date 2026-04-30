@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.models import Player, PlayerSeasonStat
 
@@ -505,7 +505,18 @@ def import_season_stats(
     for player in players:
         players_by_name.setdefault(player.name.casefold(), []).append(player)
 
+    # Preload all existing stat rows for this season — one query instead of N.
+    player_ids = [p.id for p in players if p.id is not None]
     stat_lookup: dict[tuple[int, int], PlayerSeasonStat] = {}
+    if player_ids:
+        existing_stats = session.exec(
+            select(PlayerSeasonStat).where(
+                PlayerSeasonStat.season_year == season_year,
+                col(PlayerSeasonStat.player_id).in_(player_ids),
+            )
+        ).all()
+        for s in existing_stats:
+            stat_lookup[(s.player_id, season_year)] = s
 
     for row in rows:
         name = row["name"]
@@ -526,15 +537,6 @@ def import_season_stats(
 
         key = (player.id, season_year)
         stat = stat_lookup.get(key)
-        if stat is None:
-            stat = session.exec(
-                select(PlayerSeasonStat).where(
-                    PlayerSeasonStat.player_id == player.id,
-                    PlayerSeasonStat.season_year == season_year,
-                )
-            ).first()
-            if stat is not None:
-                stat_lookup[key] = stat
 
         is_new = stat is None
         if stat is None:
@@ -639,11 +641,11 @@ def parse_roster_csv(raw_csv: str) -> tuple[list[dict], list[str]]:
         parsed["ovr"] = _to_int(row.get("ovr"))
 
         # Everything else is an integer rating (0-99)
-        for col in headers:
-            if col in {"rs", "name", "year", "pos", "ovr"} or col not in ALL_KNOWN:
+        for header in headers:
+            if header in {"rs", "name", "year", "pos", "ovr"} or header not in ALL_KNOWN:
                 continue
-            field = FIELD_RENAMES.get(col, col)
-            parsed[field] = _to_int(row.get(col))
+            field = FIELD_RENAMES.get(header, header)
+            parsed[field] = _to_int(row.get(header))
 
         rows.append(parsed)
 
@@ -667,20 +669,20 @@ def import_roster(
         created=0, updated=0, skipped=0, errors=list(warnings), total_rows=len(rows)
     )
 
-    for row in rows:
-        name = row["name"]
-        pos = row.get("pos")
+    # Single query for all existing players in this dynasty — avoids N+1 lookups.
+    existing_index: dict[tuple[str, Optional[str]], Player] = {
+        (p.name, p.pos): p
+        for p in session.exec(select(Player).where(Player.dynasty_id == dynasty_id)).all()
+    }
 
-        stmt = select(Player).where(
-            Player.dynasty_id == dynasty_id,
-            Player.name == name,
-            Player.pos == pos,
-        )
-        existing = session.exec(stmt).first()
+    for row in rows:
+        key = (row["name"], row.get("pos"))
+        existing = existing_index.get(key)
 
         if existing is None:
             player = Player(dynasty_id=dynasty_id, **row)
             session.add(player)
+            existing_index[key] = player
             result.created += 1
         elif update_existing:
             for k, v in row.items():

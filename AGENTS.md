@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project
 
-Dynasty HQ — FastAPI + SQLModel + SQLite backend tracking CFB 26 dynasty state (rosters, schedules, recruits, stats). Consumes MaxPlaysCFB CSV roster output. Deployed via Docker Compose on homelab at `https://dynasty.jickman.cc`, fronted by GoDoxy (compose labels).
+Dynasty HQ — FastAPI + SQLModel + SQLite backend tracking CFB 26 dynasty state (rosters, schedules, recruits, stats). Consumes MaxPlaysCFB CSV roster output. Runs locally via `uv` + `npm` or in a single Docker Compose container; reverse-proxy labels in `compose.yml` are written for GoDoxy but harmless under any other proxy.
 
 ## Commands
 

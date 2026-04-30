@@ -16,7 +16,9 @@ engine = create_engine(
 
 
 def init_db() -> None:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     # Import models so SQLModel sees them before create_all
     from app import models  # noqa: F401
 

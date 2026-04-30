@@ -36,6 +36,9 @@ def create_recruit(dynasty_id: int, recruit: Recruit, session: Session = Depends
     return recruit
 
 
+_RECRUIT_PROTECTED = {"id", "dynasty_id"}
+
+
 @router.patch("/{recruit_id}", response_model=RecruitRead)
 def update_recruit(
     dynasty_id: int,
@@ -47,8 +50,9 @@ def update_recruit(
     if not r or r.dynasty_id != dynasty_id:
         raise HTTPException(404, "Recruit not found")
     for k, v in patch.items():
-        if hasattr(r, k):
-            setattr(r, k, v)
+        if k in _RECRUIT_PROTECTED or not hasattr(r, k):
+            continue
+        setattr(r, k, v)
     session.add(r)
     session.commit()
     session.refresh(r)

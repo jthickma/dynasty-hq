@@ -36,8 +36,9 @@ def update_game(
     if not g or g.season_id != season_id:
         raise HTTPException(404, "Game not found")
     for k, v in patch.items():
-        if hasattr(g, k):
-            setattr(g, k, v)
+        if k in {"id", "season_id"} or not hasattr(g, k):
+            continue
+        setattr(g, k, v)
 
     if g.team_score is not None and g.opp_score is not None:
         g.played = True
@@ -49,10 +50,19 @@ def update_game(
             games = session.exec(
                 select(Game).where(Game.season_id == season_id, Game.played == True)  # noqa: E712
             ).all()
-            season.wins = sum(1 for x in games if x.result == "W")
-            season.losses = sum(1 for x in games if x.result == "L")
-            season.conf_wins = sum(1 for x in games if x.result == "W" and x.is_conference)
-            season.conf_losses = sum(1 for x in games if x.result == "L" and x.is_conference)
+            wins = losses = conf_wins = conf_losses = 0
+            for x in games:
+                is_w = x.result == "W"
+                is_l = x.result == "L"
+                wins += is_w
+                losses += is_l
+                if x.is_conference:
+                    conf_wins += is_w
+                    conf_losses += is_l
+            season.wins = wins
+            season.losses = losses
+            season.conf_wins = conf_wins
+            season.conf_losses = conf_losses
             session.add(season)
 
     session.add(g)

@@ -1,7 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlmodel import Field, Relationship, SQLModel
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 # ---------- Dynasty / Season ----------
@@ -14,7 +18,7 @@ class Dynasty(SQLModel, table=True):
     accent_color: str = "#FF6B1A"
     current_season_year: int = 2026
     current_week: int = 0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     seasons: list["Season"] = Relationship(
         back_populates="dynasty",
@@ -167,7 +171,7 @@ class Player(SQLModel, table=True):
     mcv: Optional[int] = None
     prs: Optional[int] = None
 
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
     dynasty: Optional[Dynasty] = Relationship(back_populates="players")
     season_stats: list["PlayerSeasonStat"] = Relationship(back_populates="player")
@@ -241,7 +245,7 @@ class Setting(SQLModel, table=True):
 
     key: str = Field(primary_key=True)
     value: Optional[str] = None
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class Recruit(SQLModel, table=True):

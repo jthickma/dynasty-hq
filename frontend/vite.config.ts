@@ -8,7 +8,10 @@ export default defineConfig({
     proxy: {
       "/dynasties": "http://localhost:8000",
       "/seasons": "http://localhost:8000",
+      "/settings": "http://localhost:8000",
       "/health": "http://localhost:8000",
+      "/docs": "http://localhost:8000",
+      "/openapi.json": "http://localhost:8000",
     },
   },
   build: {

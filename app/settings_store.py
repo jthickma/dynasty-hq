@@ -9,7 +9,7 @@ model. Env vars still win when set, so existing deployments keep working.
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlmodel import Session, select
@@ -37,7 +37,7 @@ def set_value(session: Session, key: str, value: Optional[str]) -> None:
         row = Setting(key=key, value=value)
     else:
         row.value = value
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(timezone.utc)
     session.add(row)
     session.commit()
 
