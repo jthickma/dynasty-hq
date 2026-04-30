@@ -1,11 +1,14 @@
 # Dynasty HQ
+## A tool that I built with claude and codex, inspired heavily by maxplayscfb, and the awesome tools on his website, maxplayscfb.com
+## Dude is a pillar of this community.
+## I know zero about coding, security practices, audit this code at your discretion. There shouldn't really be a major attack surface if you run locally. You should only run this locally. Very willing to accept PRs and any changes. For the OCR, the API key used should belong to its own separate project in the openai platform, and should have a strict, <$1 usage limit. I make no promises about application security, so do not risk your main API keys with unlimited usage. 
 
-CFB 26 Dynasty tracker — FastAPI + SQLModel + SQLite backend with a React/Tailwind SPA frontend bundled into the same container. Compatible with MaxPlaysCFB roster CSV output from the screenshot-to-CSV prompt.
+CFB 26 Dynasty tracker — FastAPI + SQLModel + SQLite backend with a React/Tailwind SPA frontend bundled into the same container. 
 
 ## What it does
 
 - Stores multi-season dynasty state (rosters, schedules, recruits, game results)
-- Imports roster CSVs directly from Max's screenshot prompt output — preamble stripped, RS icons preserved, `(RS)` year tags kept, unreadable cells left blank
+- Imports roster CSVs directly from Roster screenshot
 - **Screenshot OCR via OpenAI vision** — drop in raw roster / season-stats screenshots; the model emits the canonical CSV / text block which is then run through the same importer. API key + model are managed in the Settings page (model list pulled from `/v1/models`). See [docs/vision-ocr.md](docs/vision-ocr.md).
 - Second import updates only cells that are present — never clobbers existing ratings with blanks from a cropped screenshot
 - Auto-rolls season W-L / conference record when games are logged
