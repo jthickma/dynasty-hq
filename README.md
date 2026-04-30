@@ -12,46 +12,197 @@ CFB 26 Dynasty tracker — FastAPI + SQLModel + SQLite backend with a React/Tail
 - Rating leaders, stat leaders, roster summary by position group and class year
 - Recruiting board with weekly hours budget tracker
 
-## Deploy
+## Running Dynasty HQ
 
-Single-line deploy onto the homelab:
+Dynasty HQ supports two normal run modes:
+
+- **Docker Compose** — production / homelab mode. The image builds the React SPA, runs FastAPI with Uvicorn, stores SQLite data in `./data`, and exposes the combined API + Web UI on port `8000`.
+- **uv without Docker** — local machine mode. You build the SPA once with `npm`, then run the same FastAPI app with `uv`. The recommended command binds to `0.0.0.0`, so the Web UI is available across your LAN by default instead of only on localhost.
+
+In both modes, FastAPI serves the frontend and backend from the same origin:
+
+- Web UI: `/`
+- API docs: `/docs`
+- Health check: `/health`
+- API routes: `/dynasties`, `/seasons`, `/settings`, and related nested routes
+
+### Run Locally With uv
+
+Use this when you want to run the app directly on your Mac or Linux machine without Docker.
+
+Prerequisites:
+
+- Python `3.12`
+- `uv`
+- Node.js `20` or newer
+- `npm`
+
+Install the backend dependencies:
 
 ```zsh
-mkdir -p /opt/stacks/dynasty-hq && cd /opt/stacks/dynasty-hq
-# copy project files here (git clone / scp / rsync)
+cd /Users/jacksonhickman/dynasty-hq
+uv venv
+uv pip install -e ".[dev]"
+```
+
+Install and build the frontend:
+
+```zsh
+cd /Users/jacksonhickman/dynasty-hq/frontend
+npm install
+npm run build
+```
+
+Run the combined Web UI + API server:
+
+```zsh
+cd /Users/jacksonhickman/dynasty-hq
+mkdir -p data
+DYNASTY_DB_PATH="$PWD/data/dynasty.db" \
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Open it on the same machine:
+
+```text
+http://localhost:8000
+```
+
+Open it from another device on the same LAN:
+
+```text
+http://<server-lan-ip>:8000
+```
+
+On macOS, find the Wi-Fi LAN IP with:
+
+```zsh
+ipconfig getifaddr en0
+```
+
+If `en0` returns nothing, try:
+
+```zsh
+ipconfig getifaddr en1
+```
+
+The important part is `--host 0.0.0.0`. Uvicorn's default host is localhost-only, which prevents phones, tablets, or other computers on the LAN from reaching the Web UI. The command above intentionally makes the app listen on all network interfaces.
+
+If a LAN device cannot connect:
+
+- Confirm the server is still running.
+- Confirm the LAN IP is correct.
+- Confirm the device is on the same network.
+- Allow incoming connections for Python/Uvicorn in the local firewall if macOS prompts for it.
+- Try `http://<server-lan-ip>:8000/health`; it should return `{"status":"ok"}`.
+
+### uv Development Mode
+
+For day-to-day frontend work, run the backend and Vite dev server separately. This gives you Vite hot reload while the backend still listens on the LAN.
+
+Terminal 1:
+
+```zsh
+cd /Users/jacksonhickman/dynasty-hq
+mkdir -p data
+DYNASTY_DB_PATH="$PWD/data/dynasty.db" \
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Terminal 2:
+
+```zsh
+cd /Users/jacksonhickman/dynasty-hq/frontend
+npm install
+npm run dev -- --host 0.0.0.0
+```
+
+Open Vite locally:
+
+```text
+http://localhost:5173
+```
+
+Open Vite from another LAN device:
+
+```text
+http://<server-lan-ip>:5173
+```
+
+The Vite dev server proxies API calls for `/dynasties`, `/seasons`, and `/health` to `http://localhost:8000`, so the frontend can call the backend without a separate API base URL.
+
+### Docker Compose
+
+Use this for the homelab deployment or any machine where you want a single containerized service.
+
+```zsh
+mkdir -p /opt/stacks/dynasty-hq
+cd /opt/stacks/dynasty-hq
+# copy project files here with git clone, scp, or rsync
 mkdir -p data
 docker compose up -d --build
 ```
 
-GoDoxy discovers it via the compose labels; it's live at `https://dynasty.jickman.cc`.
+The Docker image:
 
-Logs: `docker compose logs -f dynasty-hq`
-Rebuild after code changes: `docker compose up -d --build`
+- Builds the React frontend in a Node stage.
+- Copies `frontend/dist` into the runtime image at `/app/static`.
+- Runs Uvicorn with `--host 0.0.0.0 --port 8000`.
+- Uses `DYNASTY_DB_PATH=/data/dynasty.db`.
+- Mounts host `./data` to container `/data`, so the SQLite database survives rebuilds.
 
-## Dev
+GoDoxy discovers the service through the labels in `compose.yml`; the homelab instance is available at:
 
-Backend:
+```text
+https://dynasty.jickman.cc
+```
+
+Useful Docker commands:
+
 ```zsh
-uv venv
-uv pip install -e ".[dev]"
+docker compose up -d --build              # build and start
+docker compose logs -f dynasty-hq         # follow logs
+docker compose ps                         # show container status
+docker compose restart dynasty-hq         # restart app
+docker compose down                       # stop and remove container
+```
+
+After code changes, rebuild the image:
+
+```zsh
+docker compose up -d --build
+```
+
+Do not delete `./data` unless you intentionally want to remove the local SQLite database.
+
+### Tests And Checks
+
+Run the backend test suite:
+
+```zsh
+cd /Users/jacksonhickman/dynasty-hq
 uv run pytest
-uv run uvicorn app.main:app --reload      # http://localhost:8000
 ```
 
-Frontend (separate process during development; Vite proxies API to :8000):
+Run a single importer test:
+
 ```zsh
-cd frontend
-npm install
-npm run dev                                # http://localhost:5173
+uv run pytest tests/test_importer.py::test_name -x
 ```
 
-Production / single-container:
+Run lint and formatting:
+
 ```zsh
-cd frontend && npm run build               # writes frontend/dist/
-cd .. && uv run uvicorn app.main:app       # serves SPA + API on :8000
+uv run ruff check .
+uv run ruff format .
 ```
 
-The Docker build does both stages automatically.
+Build the frontend:
+
+```zsh
+cd /Users/jacksonhickman/dynasty-hq/frontend
+npm run build
+```
 
 ## Data flow
 
