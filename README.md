@@ -125,6 +125,33 @@ docker compose down                # stop + remove (data preserved)
 
 > The bundled `compose.yml` includes labels for [GoDoxy](https://github.com/yusing/go-proxy) auto-discovery. Strip them if you use a different reverse proxy — they're harmless if ignored.
 
+### Option D — Platform binaries (no Python install required)
+
+You can now run Dynasty HQ as a standalone binary built with PyInstaller.
+
+- GitHub Actions workflow: `.github/workflows/build-binaries.yml`
+- Trigger: manual (`workflow_dispatch`) or tag push matching `v*`
+- Outputs:
+  - Linux: `dynasty-hq-Linux.tar.gz`
+  - macOS: `dynasty-hq-macOS.tar.gz`
+  - Windows: `dynasty-hq-Windows.zip`
+
+After extracting, run:
+
+```bash
+# Linux / macOS
+./dynasty-hq --host 0.0.0.0 --port 8000 --db-path ./data/dynasty.db
+
+# Windows (PowerShell)
+.\dynasty-hq.exe --host 0.0.0.0 --port 8000 --db-path .\data\dynasty.db
+```
+
+CLI flags supported by the binary:
+- `--host` (default `127.0.0.1`)
+- `--port` (default `8000`)
+- `--db-path` (optional, sets `DYNASTY_DB_PATH` for that run)
+- `--log-level` (`critical|error|warning|info|debug|trace`, default `info`)
+
 ---
 
 ## How import works
@@ -301,10 +328,11 @@ uv run pytest                                          # full suite
 uv run pytest tests/test_importer.py::test_name -x     # single test
 uv run ruff check .                                    # lint
 uv run ruff format .                                   # format
+./scripts/build-binary.sh                              # build one-file binary (Linux/macOS)
 cd frontend && npm run build                           # type-check + build SPA
 ```
 
-CI hasn't shipped yet. Until then, run the four commands above before opening a PR.
+CI hasn't shipped yet. Until then, run the commands above before opening a PR.
 
 ---
 
