@@ -25,22 +25,24 @@ OPENAI_BASE_URL = "https://api.openai.com/v1"
 OPENAI_CHAT_URL = f"{OPENAI_BASE_URL}/chat/completions"
 OPENAI_MODELS_URL = f"{OPENAI_BASE_URL}/models"
 
-DEFAULT_MODEL = "gpt-4o"
+DEFAULT_MODEL = "gpt-5.4-mini"
 TIMEOUT_SECONDS = float(os.environ.get("OPENAI_VISION_TIMEOUT", "90"))
 
 ExtractMode = Literal["roster", "season_stats"]
 
-# Heuristic prefixes for models that accept image_url input. OpenAI does not
-# return capability metadata via /v1/models, so we filter by naming convention
-# — anything Omni / 4o / 4.1 / o-series can take images. Tweak as needed.
-VISION_MODEL_PREFIXES = (
-    "gpt-4o",
-    "gpt-4.1",
-    "gpt-5",
-    "o1",
-    "o3",
-    "o4",
-    "chatgpt-4o",
+# OpenAI does not return capability metadata via /v1/models, so model discovery
+# filters dynamically by naming convention. Keep screenshot OCR on GPT-5-series
+# and newer models; suffixes like mini/nano are included automatically.
+MINIMUM_GPT_MODEL_MAJOR = 5
+NON_VISION_MODEL_TOKENS = (
+    "audio",
+    "tts",
+    "whisper",
+    "embedding",
+    "moderation",
+    "image",
+    "realtime",
+    "transcribe",
 )
 
 
@@ -246,8 +248,9 @@ def extract_season_stats_text(
 
 def list_openai_models(api_key: Optional[str] = None) -> list[dict]:
     """
-    Hit GET /v1/models. Returns each model dict augmented with a heuristic
-    `vision` boolean so the UI can flag which ones accept image input.
+    Hit GET /v1/models and return only supported GPT-5-series-and-newer
+    models. Each model dict is augmented with a heuristic `vision` boolean for
+    the UI.
     """
     headers = {"Authorization": f"Bearer {_resolve_key(api_key)}"}
     with httpx.Client(timeout=20.0) as client:
@@ -265,23 +268,30 @@ def list_openai_models(api_key: Optional[str] = None) -> list[dict]:
     out: list[dict] = []
     for m in data:
         mid = m.get("id", "")
+        if not _is_supported_vision_model(mid):
+            continue
         out.append(
             {
                 "id": mid,
                 "created": m.get("created"),
                 "owned_by": m.get("owned_by"),
-                "vision": _is_vision_model(mid),
+                "vision": True,
             }
         )
-    out.sort(key=lambda m: (not m["vision"], m["id"]))
+    out.sort(key=lambda m: m["id"])
     return out
 
 
-def _is_vision_model(model_id: str) -> bool:
+def _is_supported_vision_model(model_id: str) -> bool:
     mid = model_id.lower()
-    if any(skip in mid for skip in ("audio", "tts", "whisper", "embedding", "moderation", "image")):
+    if any(skip in mid for skip in NON_VISION_MODEL_TOKENS):
         return False
-    return any(mid.startswith(p) for p in VISION_MODEL_PREFIXES)
+
+    match = re.match(r"^gpt-(\d+)(?:[.-]|$)", mid)
+    if not match:
+        return False
+
+    return int(match.group(1)) >= MINIMUM_GPT_MODEL_MAJOR
 
 
 # ---- Helpers ----------------------------------------------------------------

@@ -103,7 +103,8 @@ def get_openai_models(api_key: str | None = None) -> dict:
     Proxy GET /v1/models. If `api_key` query param is provided we use it
     (lets the UI test a key before saving); otherwise the resolved key is used.
 
-    Returns: {models: [{id, created, owned_by, vision}], default: "gpt-4o"}
+    Returns supported GPT-5-series-and-newer models:
+    {models: [{id, created, owned_by, vision}], default: "gpt-5.4-mini"}
     """
     try:
         models = list_openai_models(api_key=api_key)
