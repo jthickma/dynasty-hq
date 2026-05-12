@@ -8,7 +8,7 @@ from typing import Optional
 
 from sqlmodel import Session, col, select
 
-from app.models import Player, PlayerSeasonStat
+from app.models import POSITION_GROUPS, Player, PlayerSeasonStat
 
 # Canonical MaxPlaysCFB column order. Used to map headers → model fields.
 # Keep lowercase for matching; map a couple of reserved/Python-safe aliases.
@@ -235,39 +235,10 @@ STAT_FLOAT_FIELDS = {
 }
 
 STAT_POSITION_ALIASES = {"OB": "QB"}
-POSITION_GROUPS = {
-    "QB": {"QB"},
-    "RB": {"HB", "FB", "RB"},
-    "WR": {"WR"},
-    "TE": {"TE"},
-    "OL": {"LT", "LG", "C", "RG", "RT", "OL"},
-    "DL": {"LE", "RE", "DT", "DL", "REDG"},
-    "LB": {"LOLB", "MLB", "ROLB", "LB", "SAM", "WILL", "MIKE"},
-    "DB": {"CB", "FS", "SS", "S", "DB"},
-    "ST": {"K", "P", "LS"},
-}
 
 
 @dataclass
 class ImportResult:
-    created: int
-    updated: int
-    skipped: int
-    errors: list[str]
-    total_rows: int
-
-    def as_dict(self) -> dict:
-        return {
-            "created": self.created,
-            "updated": self.updated,
-            "skipped": self.skipped,
-            "errors": self.errors,
-            "total_rows": self.total_rows,
-        }
-
-
-@dataclass
-class SeasonStatsImportResult:
     created: int
     updated: int
     skipped: int
@@ -469,9 +440,7 @@ def parse_season_stats_text(raw_text: str) -> tuple[list[dict], list[str]]:
 
             # Drop rows that have NO real stat data — they're noise lines that
             # happened to slot under the header (e.g., separator rules).
-            stat_fields_present = any(
-                k for k in parsed if k not in {"category", "name", "pos"}
-            )
+            stat_fields_present = any(k for k in parsed if k not in {"category", "name", "pos"})
             if not stat_fields_present:
                 i += 1
                 continue
@@ -490,9 +459,9 @@ def import_season_stats(
     dynasty_id: int,
     season_year: int,
     raw_text: str,
-) -> SeasonStatsImportResult:
+) -> ImportResult:
     rows, warnings = parse_season_stats_text(raw_text)
-    result = SeasonStatsImportResult(
+    result = ImportResult(
         created=0,
         updated=0,
         skipped=0,

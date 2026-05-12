@@ -3,9 +3,33 @@ from sqlmodel import Session, select
 
 from app.db import get_session
 from app.models import Game, Season
+from app.routers._shared import patch_fields
 from app.schemas import GameRead
 
 router = APIRouter(prefix="/seasons/{season_id}/games", tags=["games"])
+
+_PROTECTED = {"id", "season_id"}
+
+
+def _recompute_season_record(season: Season, session: Session) -> None:
+    """Recalculate W-L and conference W-L from played games."""
+    games = session.exec(
+        select(Game).where(Game.season_id == season.id, Game.played == True)  # noqa: E712
+    ).all()
+    wins = losses = conf_wins = conf_losses = 0
+    for g in games:
+        is_w = g.result == "W"
+        is_l = g.result == "L"
+        wins += is_w
+        losses += is_l
+        if g.is_conference:
+            conf_wins += is_w
+            conf_losses += is_l
+    season.wins = wins
+    season.losses = losses
+    season.conf_wins = conf_wins
+    season.conf_losses = conf_losses
+    session.add(season)
 
 
 @router.get("", response_model=list[GameRead])
@@ -35,10 +59,7 @@ def update_game(
     g = session.get(Game, game_id)
     if not g or g.season_id != season_id:
         raise HTTPException(404, "Game not found")
-    for k, v in patch.items():
-        if k in {"id", "season_id"} or not hasattr(g, k):
-            continue
-        setattr(g, k, v)
+    patch_fields(g, patch, _PROTECTED)
 
     if g.team_score is not None and g.opp_score is not None:
         g.played = True
@@ -47,23 +68,7 @@ def update_game(
     if g.played and g.result:
         season = session.get(Season, season_id)
         if season:
-            games = session.exec(
-                select(Game).where(Game.season_id == season_id, Game.played == True)  # noqa: E712
-            ).all()
-            wins = losses = conf_wins = conf_losses = 0
-            for x in games:
-                is_w = x.result == "W"
-                is_l = x.result == "L"
-                wins += is_w
-                losses += is_l
-                if x.is_conference:
-                    conf_wins += is_w
-                    conf_losses += is_l
-            season.wins = wins
-            season.losses = losses
-            season.conf_wins = conf_wins
-            season.conf_losses = conf_losses
-            session.add(season)
+            _recompute_season_record(season, session)
 
     session.add(g)
     session.commit()

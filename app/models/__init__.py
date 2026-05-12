@@ -8,6 +8,27 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# Shared constants — used by routers, importer, frontend types
+POSITION_GROUPS: dict[str, set[str]] = {
+    "QB": {"QB"},
+    "RB": {"HB", "FB", "RB"},
+    "WR": {"WR"},
+    "TE": {"TE"},
+    "OL": {"LT", "LG", "C", "RG", "RT", "OL"},
+    "DL": {"LE", "RE", "DT", "DL", "REDG"},
+    "LB": {"LOLB", "MLB", "ROLB", "LB", "SAM", "WILL", "MIKE"},
+    "DB": {"CB", "FS", "SS", "S", "DB"},
+    "ST": {"K", "P", "LS"},
+}
+
+POSITION_GROUP_NAMES: tuple[str, ...] = tuple(POSITION_GROUPS.keys())
+
+# Flattened pos → group lookup
+POS_TO_GROUP: dict[str, str] = {
+    pos: group for group, positions in POSITION_GROUPS.items() for pos in positions
+}
+
+
 # ---------- Dynasty / Season ----------
 
 

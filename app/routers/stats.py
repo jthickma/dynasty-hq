@@ -4,8 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, col, select
 
 from app.db import get_session
-from app.models import Player, PlayerSeasonStat
-from app.routers.players import POSITION_GROUPS
+from app.models import POSITION_GROUP_NAMES, POSITION_GROUPS, POS_TO_GROUP, Player, PlayerSeasonStat
 
 router = APIRouter(prefix="/dynasties/{dynasty_id}/stats", tags=["stats"])
 
@@ -30,7 +29,7 @@ def rating_leaders(
             select(Player)
             .where(
                 Player.dynasty_id == dynasty_id,
-                col(Player.pos).in_(positions),
+                col(Player.pos).in_(list(positions)),
             )
             .order_by(col(Player.ovr).desc().nulls_last())
             .limit(5)
@@ -97,15 +96,14 @@ def roster_summary(
     """Counts by position group and class year."""
     all_players = session.exec(select(Player).where(Player.dynasty_id == dynasty_id)).all()
 
-    pos_to_group = {pos: group for group, positions in POSITION_GROUPS.items() for pos in positions}
-    by_group = {g: 0 for g in POSITION_GROUPS}
+    by_group = {g: 0 for g in POSITION_GROUP_NAMES}
     by_year = {"FR": 0, "SO": 0, "JR": 0, "SR": 0, "UNK": 0}
     dev_traits = {"Elite": 0, "Star": 0, "Impact": 0, "Normal": 0, "UNK": 0}
 
     ovr_sum = 0
     ovr_count = 0
     for p in all_players:
-        group = pos_to_group.get(p.pos)
+        group = POS_TO_GROUP.get(p.pos)
         if group:
             by_group[group] += 1
         year_key = (p.year or "UNK").split(" ", 1)[0]

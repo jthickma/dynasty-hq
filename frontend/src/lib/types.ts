@@ -191,7 +191,12 @@ export interface RosterSummary {
 }
 
 export interface RatingLeaders {
-  overall: { id: number; name: string; pos: string | null; ovr: number | null }[];
+  overall: {
+    id: number;
+    name: string;
+    pos: string | null;
+    ovr: number | null;
+  }[];
   by_position_group: Record<
     string,
     { id: number; name: string; pos: string | null; ovr: number | null }[]
@@ -200,7 +205,12 @@ export interface RatingLeaders {
 
 export type StatLeaders = Record<
   string,
-  { player_id: number; name: string; pos: string | null; value: number | null }[]
+  {
+    player_id: number;
+    name: string;
+    pos: string | null;
+    value: number | null;
+  }[]
 >;
 
 export interface ImportResult {
@@ -211,14 +221,33 @@ export interface ImportResult {
   total_rows: number;
 }
 
-export const POSITION_GROUPS = ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "ST"] as const;
+/** Mirrors app.models.POSITION_GROUP_NAMES — keep in sync */
+export const POSITION_GROUPS = [
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'OL',
+  'DL',
+  'LB',
+  'DB',
+  'ST',
+] as const;
 export type PositionGroup = (typeof POSITION_GROUPS)[number];
+
+/** Common class years used in roster/summary filters */
+export const CLASS_YEARS = ['FR', 'SO', 'JR', 'SR'] as const;
+export type ClassYear = (typeof CLASS_YEARS)[number];
+
+/** Dev trait options */
+export const DEV_TRAITS = ['Normal', 'Impact', 'Star', 'Elite'] as const;
+export type DevTrait = (typeof DEV_TRAITS)[number];
 
 export interface AppSettings {
   openai_api_key_set: boolean;
-  openai_api_key_source: "env" | "db" | "unset";
+  openai_api_key_source: 'env' | 'db' | 'unset';
   openai_vision_model: string;
-  openai_vision_model_source: "env" | "db" | "default";
+  openai_vision_model_source: 'env' | 'db' | 'default';
   default_model: string;
 }
 

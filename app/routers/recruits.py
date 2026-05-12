@@ -3,9 +3,12 @@ from sqlmodel import Session, col, select
 
 from app.db import get_session
 from app.models import Recruit
+from app.routers._shared import patch_fields
 from app.schemas import RecruitRead
 
 router = APIRouter(prefix="/dynasties/{dynasty_id}/recruits", tags=["recruits"])
+
+_PROTECTED = {"id", "dynasty_id"}
 
 
 @router.get("", response_model=list[RecruitRead])
@@ -36,9 +39,6 @@ def create_recruit(dynasty_id: int, recruit: Recruit, session: Session = Depends
     return recruit
 
 
-_RECRUIT_PROTECTED = {"id", "dynasty_id"}
-
-
 @router.patch("/{recruit_id}", response_model=RecruitRead)
 def update_recruit(
     dynasty_id: int,
@@ -49,10 +49,7 @@ def update_recruit(
     r = session.get(Recruit, recruit_id)
     if not r or r.dynasty_id != dynasty_id:
         raise HTTPException(404, "Recruit not found")
-    for k, v in patch.items():
-        if k in _RECRUIT_PROTECTED or not hasattr(r, k):
-            continue
-        setattr(r, k, v)
+    patch_fields(r, patch, _PROTECTED)
     session.add(r)
     session.commit()
     session.refresh(r)

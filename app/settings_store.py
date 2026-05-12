@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.db import engine
 from app.models import Setting
@@ -42,11 +42,6 @@ def set_value(session: Session, key: str, value: Optional[str]) -> None:
     session.commit()
 
 
-def all_settings(session: Session) -> dict[str, Optional[str]]:
-    rows = session.exec(select(Setting)).all()
-    return {r.key: r.value for r in rows}
-
-
 # ---- OpenAI-specific resolution -------------------------------------------
 
 
@@ -56,8 +51,4 @@ def resolve_openai_api_key() -> Optional[str]:
 
 
 def resolve_openai_vision_model(default: str = "gpt-4o") -> str:
-    return (
-        os.environ.get("OPENAI_VISION_MODEL")
-        or get(KEY_OPENAI_VISION_MODEL)
-        or default
-    )
+    return os.environ.get("OPENAI_VISION_MODEL") or get(KEY_OPENAI_VISION_MODEL) or default

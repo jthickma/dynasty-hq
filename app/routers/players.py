@@ -3,21 +3,12 @@ from sqlmodel import Session, col, select
 
 from app.db import get_session
 from app.models import Player, PlayerSeasonStat
+from app.routers._shared import patch_fields, resolve_pos_group
 from app.schemas import PlayerRead, PlayerSeasonStatRead
 
 router = APIRouter(prefix="/dynasties/{dynasty_id}/players", tags=["players"])
 
-POSITION_GROUPS = {
-    "QB": ["QB"],
-    "RB": ["HB", "FB", "RB"],
-    "WR": ["WR"],
-    "TE": ["TE"],
-    "OL": ["LT", "LG", "C", "RG", "RT", "OL"],
-    "DL": ["LE", "RE", "DT", "DL"],
-    "LB": ["LOLB", "MLB", "ROLB", "LB"],
-    "DB": ["CB", "FS", "SS", "S", "DB"],
-    "ST": ["K", "P", "LS"],
-}
+_PROTECTED = {"id", "dynasty_id"}
 
 
 @router.get("", response_model=list[PlayerRead])
@@ -32,9 +23,10 @@ def list_players(
 ):
     stmt = select(Player).where(Player.dynasty_id == dynasty_id)
     if pos_group:
-        group = POSITION_GROUPS.get(pos_group.upper())
-        if not group:
-            raise HTTPException(400, f"Unknown position group {pos_group}")
+        try:
+            group = resolve_pos_group(pos_group)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
         stmt = stmt.where(col(Player.pos).in_(group))
     if pos:
         stmt = stmt.where(Player.pos == pos)
@@ -56,9 +48,6 @@ def get_player(dynasty_id: int, player_id: int, session: Session = Depends(get_s
     return p
 
 
-_PLAYER_PROTECTED = {"id", "dynasty_id"}
-
-
 @router.patch("/{player_id}", response_model=PlayerRead)
 def update_player(
     dynasty_id: int,
@@ -69,10 +58,7 @@ def update_player(
     p = session.get(Player, player_id)
     if not p or p.dynasty_id != dynasty_id:
         raise HTTPException(404, "Player not found")
-    for k, v in patch.items():
-        if k in _PLAYER_PROTECTED or not hasattr(p, k):
-            continue
-        setattr(p, k, v)
+    patch_fields(p, patch, _PROTECTED)
     session.add(p)
     session.commit()
     session.refresh(p)
@@ -89,11 +75,16 @@ def delete_player(dynasty_id: int, player_id: int, session: Session = Depends(ge
     return {"ok": True}
 
 
-@router.get("/{player_id}/stats", response_model=list[PlayerSeasonStatRead])
-def player_stats(dynasty_id: int, player_id: int, session: Session = Depends(get_session)):
+def _require_player(dynasty_id: int, player_id: int, session: Session) -> Player:
     p = session.get(Player, player_id)
     if not p or p.dynasty_id != dynasty_id:
         raise HTTPException(404, "Player not found")
+    return p
+
+
+@router.get("/{player_id}/stats", response_model=list[PlayerSeasonStatRead])
+def player_stats(dynasty_id: int, player_id: int, session: Session = Depends(get_session)):
+    _require_player(dynasty_id, player_id, session)
     stmt = (
         select(PlayerSeasonStat)
         .where(PlayerSeasonStat.player_id == player_id)
@@ -109,9 +100,7 @@ def add_player_stat(
     stat: PlayerSeasonStat,
     session: Session = Depends(get_session),
 ):
-    p = session.get(Player, player_id)
-    if not p or p.dynasty_id != dynasty_id:
-        raise HTTPException(404, "Player not found")
+    _require_player(dynasty_id, player_id, session)
     stat.player_id = player_id
     session.add(stat)
     session.commit()
@@ -127,18 +116,11 @@ def update_player_stat(
     patch: dict,
     session: Session = Depends(get_session),
 ):
-    p = session.get(Player, player_id)
-    if not p or p.dynasty_id != dynasty_id:
-        raise HTTPException(404, "Player not found")
-
+    _require_player(dynasty_id, player_id, session)
     stat = session.get(PlayerSeasonStat, stat_id)
     if not stat or stat.player_id != player_id:
         raise HTTPException(404, "Season stat not found")
-
-    for k, v in patch.items():
-        if k in {"id", "player_id"} or not hasattr(stat, k):
-            continue
-        setattr(stat, k, v)
+    patch_fields(stat, patch, {"id", "player_id"})
     session.add(stat)
     session.commit()
     session.refresh(stat)
@@ -152,14 +134,10 @@ def delete_player_stat(
     stat_id: int,
     session: Session = Depends(get_session),
 ):
-    p = session.get(Player, player_id)
-    if not p or p.dynasty_id != dynasty_id:
-        raise HTTPException(404, "Player not found")
-
+    _require_player(dynasty_id, player_id, session)
     stat = session.get(PlayerSeasonStat, stat_id)
     if not stat or stat.player_id != player_id:
         raise HTTPException(404, "Season stat not found")
-
     session.delete(stat)
     session.commit()
     return {"ok": True}

@@ -4,8 +4,11 @@ from sqlmodel import Session, select
 from app.db import get_session
 from app.models import Dynasty, Season
 from app.schemas import DynastyRead, SeasonRead
+from app.routers._shared import patch_fields
 
 router = APIRouter(prefix="/dynasties", tags=["dynasty"])
+
+_PROTECTED = {"id", "created_at"}
 
 
 @router.post("", response_model=DynastyRead)
@@ -32,18 +35,12 @@ def get_dynasty(dynasty_id: int, session: Session = Depends(get_session)):
     return d
 
 
-_DYNASTY_PROTECTED = {"id", "created_at"}
-
-
 @router.patch("/{dynasty_id}", response_model=DynastyRead)
 def update_dynasty(dynasty_id: int, patch: dict, session: Session = Depends(get_session)):
     d = session.get(Dynasty, dynasty_id)
     if not d:
         raise HTTPException(404, "Dynasty not found")
-    for k, v in patch.items():
-        if k in _DYNASTY_PROTECTED or not hasattr(d, k):
-            continue
-        setattr(d, k, v)
+    patch_fields(d, patch, _PROTECTED)
     session.add(d)
     session.commit()
     session.refresh(d)
