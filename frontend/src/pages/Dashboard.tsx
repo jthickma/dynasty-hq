@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useActiveDynasty } from '../hooks/useDynastyId';
-import { PageHeader, Stat, Empty, Spinner } from '../components/UI';
+import { Stat, Empty, Spinner } from '../components/UI';
+import { TeamLogo } from '../components/TeamLogo';
 import { ratingColor, devTraitColor } from '../lib/format';
 import { POSITION_GROUPS } from '../lib/types';
 
@@ -26,10 +27,19 @@ export function Dashboard() {
 
   return (
     <>
-      <PageHeader
-        title={`${active.school} ${active.name}`}
-        subtitle={`Season ${active.current_season_year} · Week ${active.current_week} · ${dynasties?.length ?? 1} dynasty${(dynasties?.length ?? 1) === 1 ? '' : 'ies'}`}
-      />
+      <div className="flex flex-wrap items-center gap-3 mb-4 md:mb-6">
+        <TeamLogo school={active.school} size={56} fallbackColor={active.accent_color} />
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight">
+            {active.school} {active.name}
+          </h1>
+          <p className="text-sm text-ink-muted mt-0.5">
+            Season {active.current_season_year} · Week {active.current_week} ·{' '}
+            {dynasties?.length ?? 1} dynast
+            {(dynasties?.length ?? 1) === 1 ? 'y' : 'ies'}
+          </p>
+        </div>
+      </div>
       <QuickActions />
       <DashboardBody dynastyId={active.id} year={active.current_season_year} />
     </>

@@ -2,6 +2,8 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useActiveDynasty } from '../hooks/useDynastyId';
 import { DynastySwitcher } from './DynastySwitcher';
+import { TeamLogo } from './TeamLogo';
+import { lookupTeam } from '../lib/teams';
 import {
   HomeIcon,
   RosterIcon,
@@ -43,16 +45,20 @@ export function Layout() {
       <aside className="hidden md:flex md:w-60 lg:w-64 flex-col border-r border-border bg-bg-soft sticky top-0 h-screen">
         <div className="px-4 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <div
-              className="h-8 w-8 rounded-md grid place-items-center font-bold text-black"
-              style={{ background: 'var(--accent)' }}
-            >
-              D
-            </div>
+            {active && lookupTeam(active.school) ? (
+              <TeamLogo school={active.school} size={32} />
+            ) : (
+              <div
+                className="h-8 w-8 rounded-md grid place-items-center font-bold text-black"
+                style={{ background: 'var(--accent)' }}
+              >
+                D
+              </div>
+            )}
             <div>
               <div className="text-sm font-bold tracking-wide">DYNASTY HQ</div>
               <div className="text-[10px] text-ink-muted uppercase tracking-widest">
-                CFB 26 tracker
+                {active?.school ?? 'CFB 26 tracker'}
               </div>
             </div>
           </div>
@@ -90,12 +96,16 @@ export function Layout() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
         <header className="md:hidden sticky top-0 z-20 bg-bg-soft border-b border-border px-3 py-2 flex items-center gap-2">
-          <div
-            className="h-7 w-7 rounded-md grid place-items-center font-bold text-black text-sm"
-            style={{ background: 'var(--accent)' }}
-          >
-            D
-          </div>
+          {active && lookupTeam(active.school) ? (
+            <TeamLogo school={active.school} size={28} />
+          ) : (
+            <div
+              className="h-7 w-7 rounded-md grid place-items-center font-bold text-black text-sm"
+              style={{ background: 'var(--accent)' }}
+            >
+              D
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <DynastySwitcher />
           </div>

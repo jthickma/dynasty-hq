@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useActiveDynasty } from "../hooks/useDynastyId";
 import { ChevronDown, PlusIcon } from "./Icons";
+import { TeamLogo } from "./TeamLogo";
 
 export function DynastySwitcher() {
   const { dynasties, active, setActiveId } = useActiveDynasty();
@@ -24,10 +25,7 @@ export function DynastySwitcher() {
       >
         {active ? (
           <>
-            <span
-              className="h-2.5 w-2.5 rounded-full shrink-0"
-              style={{ background: active.accent_color }}
-            />
+            <TeamLogo school={active.school} size={20} fallbackColor={active.accent_color} />
             <span className="truncate font-medium text-left flex-1">
               {active.school}
               <span className="text-ink-muted ml-2 font-normal">{active.name}</span>
@@ -52,10 +50,7 @@ export function DynastySwitcher() {
                   active?.id === d.id ? "bg-bg-hover" : ""
                 }`}
               >
-                <span
-                  className="h-2.5 w-2.5 rounded-full shrink-0"
-                  style={{ background: d.accent_color }}
-                />
+                <TeamLogo school={d.school} size={20} fallbackColor={d.accent_color} />
                 <div className="flex-1 truncate">
                   <div className="font-medium truncate">{d.school}</div>
                   <div className="text-xs text-ink-muted truncate">{d.name}</div>

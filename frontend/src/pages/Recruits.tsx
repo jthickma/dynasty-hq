@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import { useActiveDynasty } from "../hooks/useDynastyId";
 import { PageHeader, Empty, Spinner, ErrorBox, Modal, Stat } from "../components/UI";
 import { PlusIcon, TrashIcon, StarIcon, CheckIcon } from "../components/Icons";
+import { TeamLogo } from "../components/TeamLogo";
+import { TEAMS } from "../lib/teams";
 import type { Recruit } from "../lib/types";
 
 export function Recruits() {
@@ -129,8 +131,12 @@ export function Recruits() {
                   <div className="font-semibold truncate flex items-center gap-2">
                     {r.name}
                     {r.committed && (
-                      <span className="text-emerald-400 inline-flex items-center gap-0.5 text-xs">
-                        <CheckIcon width={14} height={14} /> {r.committed_to ?? "Committed"}
+                      <span className="text-emerald-400 inline-flex items-center gap-1 text-xs">
+                        <CheckIcon width={14} height={14} />
+                        {r.committed_to && (
+                          <TeamLogo school={r.committed_to} size={16} />
+                        )}
+                        {r.committed_to ?? "Committed"}
                       </span>
                     )}
                   </div>
@@ -281,11 +287,15 @@ function RecruitModal({ recruit, onClose }: { recruit?: Recruit; onClose: () => 
           </div>
           <div>
             <label className="label">School leader</label>
-            <input
-              className="input"
-              value={form.school_leader}
-              onChange={(e) => setForm({ ...form, school_leader: e.target.value })}
-            />
+            <div className="flex items-center gap-2">
+              <TeamLogo school={form.school_leader} size={24} />
+              <input
+                className="input flex-1"
+                list="recruit-team-list"
+                value={form.school_leader}
+                onChange={(e) => setForm({ ...form, school_leader: e.target.value })}
+              />
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -354,12 +364,21 @@ function RecruitModal({ recruit, onClose }: { recruit?: Recruit; onClose: () => 
           </label>
           <div className="col-span-2">
             <label className="label">Committed to</label>
-            <input
-              className="input"
-              value={form.committed_to}
-              onChange={(e) => setForm({ ...form, committed_to: e.target.value })}
-              disabled={!form.committed}
-            />
+            <div className="flex items-center gap-2">
+              <TeamLogo school={form.committed_to} size={24} />
+              <input
+                className="input flex-1"
+                list="recruit-team-list"
+                value={form.committed_to}
+                onChange={(e) => setForm({ ...form, committed_to: e.target.value })}
+                disabled={!form.committed}
+              />
+            </div>
+            <datalist id="recruit-team-list">
+              {TEAMS.map((t) => (
+                <option key={t.slug} value={t.name} />
+              ))}
+            </datalist>
           </div>
         </div>
         {save.isError && <ErrorBox error={save.error} />}

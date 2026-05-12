@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import { useDynasties, useActiveDynasty } from "../hooks/useDynastyId";
 import { PageHeader, Modal, ErrorBox, Spinner } from "../components/UI";
 import { PlusIcon, TrashIcon, CheckIcon } from "../components/Icons";
+import { TeamLogo } from "../components/TeamLogo";
+import { TEAMS, lookupTeam } from "../lib/teams";
 
 export function Dynasties() {
   const { data: dynasties, isLoading } = useDynasties();
@@ -36,10 +38,7 @@ export function Dynasties() {
             <div key={d.id} className="card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className="h-3 w-3 rounded-full shrink-0"
-                    style={{ background: d.accent_color }}
-                  />
+                  <TeamLogo school={d.school} size={28} fallbackColor={d.accent_color} />
                   <div className="min-w-0">
                     <div className="font-semibold truncate">{d.school}</div>
                     <div className="text-sm text-ink-muted truncate">{d.name}</div>
@@ -103,14 +102,18 @@ function CreateDynastyModal({ open, onClose }: { open: boolean; onClose: () => v
   const [name, setName] = useState("");
   const [school, setSchool] = useState("");
   const [accent, setAccent] = useState("#FF6B1A");
+  const [accentTouched, setAccentTouched] = useState(false);
   const [year, setYear] = useState(2026);
+
+  // Auto-fill accent + canonical school name when typed input matches a known team.
+  const matched = lookupTeam(school);
 
   const create = useMutation({
     mutationFn: () =>
       api.createDynasty({
         name,
-        school,
-        accent_color: accent,
+        school: matched?.name ?? school,
+        accent_color: accentTouched ? accent : (matched?.primary ?? accent),
         current_season_year: year,
         current_week: 0,
       }),
@@ -128,12 +131,31 @@ function CreateDynastyModal({ open, onClose }: { open: boolean; onClose: () => v
       <div className="space-y-3">
         <div>
           <label className="label">School</label>
-          <input
-            className="input"
-            placeholder="Tennessee"
-            value={school}
-            onChange={(e) => setSchool(e.target.value)}
-          />
+          <div className="flex items-center gap-2">
+            <TeamLogo
+              school={matched?.name ?? school}
+              size={32}
+              fallbackColor={accent}
+            />
+            <input
+              className="input flex-1"
+              placeholder="Tennessee"
+              list="team-list"
+              value={school}
+              onChange={(e) => {
+                setSchool(e.target.value);
+                if (!accentTouched) {
+                  const t = lookupTeam(e.target.value);
+                  if (t) setAccent(t.primary);
+                }
+              }}
+            />
+          </div>
+          <datalist id="team-list">
+            {TEAMS.map((t) => (
+              <option key={t.slug} value={t.name} />
+            ))}
+          </datalist>
         </div>
         <div>
           <label className="label">Dynasty name</label>
@@ -160,13 +182,19 @@ function CreateDynastyModal({ open, onClose }: { open: boolean; onClose: () => v
               <input
                 type="color"
                 value={accent}
-                onChange={(e) => setAccent(e.target.value)}
+                onChange={(e) => {
+                  setAccent(e.target.value);
+                  setAccentTouched(true);
+                }}
                 className="h-9 w-12 rounded bg-bg-soft border border-border"
               />
               <input
                 className="input flex-1"
                 value={accent}
-                onChange={(e) => setAccent(e.target.value)}
+                onChange={(e) => {
+                  setAccent(e.target.value);
+                  setAccentTouched(true);
+                }}
               />
             </div>
           </div>

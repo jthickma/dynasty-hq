@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import { useActiveDynasty } from "../hooks/useDynastyId";
 import { PageHeader, Empty, Spinner, ErrorBox, Modal } from "../components/UI";
 import { PlusIcon, TrashIcon } from "../components/Icons";
+import { TeamLogo } from "../components/TeamLogo";
+import { TEAMS } from "../lib/teams";
 import type { Game, Season } from "../lib/types";
 
 export function Schedule() {
@@ -119,6 +121,9 @@ export function Schedule() {
               >
                 {g.is_bye ? "—" : g.result ?? "·"}
               </div>
+              {!g.is_bye && (
+                <TeamLogo school={g.opponent} size={28} />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="font-semibold truncate">
                   {g.is_bye ? "BYE" : `${g.home_away === "A" ? "@" : g.home_away === "N" ? "vs" : "vs"} ${g.opponent}`}
@@ -276,11 +281,20 @@ function GameModal({
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
               <label className="label">Opponent</label>
-              <input
-                className="input"
-                value={form.opponent}
-                onChange={(e) => setForm({ ...form, opponent: e.target.value })}
-              />
+              <div className="flex items-center gap-2">
+                <TeamLogo school={form.opponent} size={28} />
+                <input
+                  className="input flex-1"
+                  list="opponent-list"
+                  value={form.opponent}
+                  onChange={(e) => setForm({ ...form, opponent: e.target.value })}
+                />
+                <datalist id="opponent-list">
+                  {TEAMS.map((t) => (
+                    <option key={t.slug} value={t.name} />
+                  ))}
+                </datalist>
+              </div>
             </div>
             <div>
               <label className="label">Rank</label>
