@@ -362,6 +362,51 @@ def _coerce_stat_value(field: str, value: Optional[str]) -> Optional[int | float
     return _to_int(value)
 
 
+def _read_csv_line(line: str) -> list[str]:
+    return next(csv.reader([line]))
+
+
+def _align_row_to_headers(raw_row: list[str], headers: list[str]) -> dict[str, str]:
+    cells = raw_row + [""] * (len(headers) - len(raw_row))
+    return dict(zip(headers, cells[: len(headers)]))
+
+
+def _is_total_name(name: str) -> bool:
+    normalized_name = re.sub(r"[^a-z]", "", name.lower())
+    return normalized_name in TOTAL_NAMES
+
+
+def _parse_stat_row(
+    section: str,
+    section_columns: dict[str, str],
+    row: dict[str, str],
+) -> dict:
+    name = _clean_cell(row.get("name"))
+    if not name or _is_total_name(name):
+        return {}
+
+    parsed: dict = {"category": section, "name": name}
+    pos = _normalize_stat_pos(row.get("pos"))
+    if pos is not None:
+        parsed["pos"] = pos
+
+    # Resolve each header to a field. Multiple headers can map to the same
+    # field (e.g., "att" and "atts") — first non-None wins.
+    for header, field in section_columns.items():
+        if field in {"name", "pos"} or header not in row:
+            continue
+        value = _coerce_stat_value(field, row.get(header))
+        if value is None or parsed.get(field) is not None:
+            continue
+        parsed[field] = value
+
+    return parsed
+
+
+def _has_stat_data(parsed_row: dict) -> bool:
+    return any(k for k in parsed_row if k not in {"category", "name", "pos"})
+
+
 def parse_season_stats_text(raw_text: str) -> tuple[list[dict], list[str]]:
     warnings: list[str] = []
     rows: list[dict] = []
@@ -386,7 +431,7 @@ def parse_season_stats_text(raw_text: str) -> tuple[list[dict], list[str]]:
             warnings.append(f"Section {section.upper()} at line {line_no} is missing a header row")
             break
 
-        header_cells = next(csv.reader([lines[i]]))
+        header_cells = _read_csv_line(lines[i])
         headers = [_normalize_header(h) for h in header_cells]
         i += 1
 
@@ -403,10 +448,7 @@ def parse_season_stats_text(raw_text: str) -> tuple[list[dict], list[str]]:
                 i += 1
                 continue
 
-            raw_row = next(csv.reader([lines[i]]))
-            cells = list(raw_row) + [""] * (len(headers) - len(raw_row))
-            cells = cells[: len(headers)]
-            row = dict(zip(headers, cells))
+            row = _align_row_to_headers(_read_csv_line(lines[i]), headers)
 
             name = _clean_cell(row.get("name"))
             if not name:
@@ -415,33 +457,15 @@ def parse_season_stats_text(raw_text: str) -> tuple[list[dict], list[str]]:
                 continue
 
             # Aggregate / total rows ("TEAM", "TOTAL") leak into pasted blocks.
-            normalized_name = re.sub(r"[^a-z]", "", name.lower())
-            if normalized_name in TOTAL_NAMES:
+            if _is_total_name(name):
                 i += 1
                 continue
 
-            parsed: dict = {"category": section, "name": name}
-            pos = _normalize_stat_pos(row.get("pos"))
-            if pos is not None:
-                parsed["pos"] = pos
-
-            # Resolve each header to a field. Multiple headers can map to the
-            # same field (e.g., "att" and "atts") — first non-None wins.
-            for header, field in section_columns.items():
-                if field in {"name", "pos"}:
-                    continue
-                if header not in row:
-                    continue
-                value = _coerce_stat_value(field, row.get(header))
-                if value is None:
-                    continue
-                if parsed.get(field) is None:
-                    parsed[field] = value
+            parsed = _parse_stat_row(section, section_columns, row)
 
             # Drop rows that have NO real stat data — they're noise lines that
             # happened to slot under the header (e.g., separator rules).
-            stat_fields_present = any(k for k in parsed if k not in {"category", "name", "pos"})
-            if not stat_fields_present:
+            if not _has_stat_data(parsed):
                 i += 1
                 continue
 
@@ -594,9 +618,7 @@ def parse_roster_csv(raw_csv: str) -> tuple[list[dict], list[str]]:
             continue
 
         # Align cells to headers, padding short rows, truncating long ones
-        cells = list(raw_row) + [""] * (len(headers) - len(raw_row))
-        cells = cells[: len(headers)]
-        row = dict(zip(headers, cells))
+        row = _align_row_to_headers(list(raw_row), headers)
 
         name = _clean_cell(row.get("name"))
         if not name:

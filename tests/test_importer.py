@@ -322,3 +322,15 @@ A.Q,OB,1,20,30,66.7,250,2,6.7,1,3.3,2.0
     assert row["pass_yds"] == 250
     assert row["pass_int"] == 1
     assert row["pass_td_int_ratio"] == 2.0
+
+
+def test_parse_duplicate_stat_aliases_use_first_non_empty_value():
+    text = """RUSHING
+NAME,POS,GP,CAR,ATT,YARDS,AVG,TD
+J.Doe,HB,1,,12,84,7.0,1
+K.Back,HB,1,8,99,40,5.0,0
+"""
+    rows, warnings = parse_season_stats_text(text)
+    assert warnings == []
+    assert rows[0]["rush_att"] == 12
+    assert rows[1]["rush_att"] == 8
