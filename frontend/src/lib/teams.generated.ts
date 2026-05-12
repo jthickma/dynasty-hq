@@ -281,11 +281,18 @@ export const TEAMS: TeamMeta[] = [
     "secondary": "#D08034"
   },
   {
+    "name": "Jax St",
+    "slug": "jax-st",
+    "logo": "/teams/jax-st.png",
+    "primary": "#AC222C",
+    "secondary": "#916661"
+  },
+  {
     "name": "Kansas",
     "slug": "kansas",
     "logo": "/teams/kansas.png",
-    "primary": "#C61E32",
-    "secondary": "#E3808C"
+    "primary": "#0A56BA",
+    "secondary": "#407CCC"
   },
   {
     "name": "Kansas St",
@@ -293,6 +300,13 @@ export const TEAMS: TeamMeta[] = [
     "logo": "/teams/kansas-st.png",
     "primary": "#340C5C",
     "secondary": "#4C2C6C"
+  },
+  {
+    "name": "Kennesaw St",
+    "slug": "kennesaw-st",
+    "logo": "/teams/kennesaw-st.png",
+    "primary": "#956C15",
+    "secondary": "#FAB31C"
   },
   {
     "name": "Kent St",
@@ -307,6 +321,13 @@ export const TEAMS: TeamMeta[] = [
     "logo": "/teams/kentucky.png",
     "primary": "#0433A3",
     "secondary": "#3C64B4"
+  },
+  {
+    "name": "LSU",
+    "slug": "lsu",
+    "logo": "/teams/lsu.png",
+    "primary": "#DF9D2D",
+    "secondary": "#64324F"
   },
   {
     "name": "Liberty",
@@ -333,8 +354,8 @@ export const TEAMS: TeamMeta[] = [
     "name": "Marshall",
     "slug": "marshall",
     "logo": "/teams/marshall.png",
-    "primary": "#07AD46",
-    "secondary": "#7CD49C"
+    "primary": "#F8BA2D",
+    "secondary": "#9C7456"
   },
   {
     "name": "Maryland",
@@ -398,6 +419,13 @@ export const TEAMS: TeamMeta[] = [
     "logo": "/teams/missouri.png",
     "primary": "#BF8E20",
     "secondary": "#F8B526"
+  },
+  {
+    "name": "Missouri St",
+    "slug": "missouri-st",
+    "logo": "/teams/missouri-st.png",
+    "primary": "#693743",
+    "secondary": "#B494A4"
   },
   {
     "name": "NC State",
@@ -554,11 +582,18 @@ export const TEAMS: TeamMeta[] = [
     "secondary": "#D00434"
   },
   {
+    "name": "Sam Houston",
+    "slug": "sam-houston",
+    "logo": "/teams/sam-houston.png",
+    "primary": "#D94C22",
+    "secondary": "#422E24"
+  },
+  {
     "name": "San Diego St",
     "slug": "san-diego-st",
     "logo": "/teams/san-diego-st.png",
-    "primary": "#F25324",
-    "secondary": "#A33B1A"
+    "primary": "#C2333B",
+    "secondary": "#89222A"
   },
   {
     "name": "San Jose St",
@@ -694,11 +729,18 @@ export const TEAMS: TeamMeta[] = [
     "secondary": "#A4442C"
   },
   {
+    "name": "UMass",
+    "slug": "umass",
+    "logo": "/teams/umass.png",
+    "primary": "#972436",
+    "secondary": "#7C7C7C"
+  },
+  {
     "name": "UNLV",
     "slug": "unlv",
     "logo": "/teams/unlv.png",
-    "primary": "#C90404",
-    "secondary": "#A90404"
+    "primary": "#822E2E",
+    "secondary": "#BC8181"
   },
   {
     "name": "USC",
@@ -722,6 +764,13 @@ export const TEAMS: TeamMeta[] = [
     "secondary": "#D18E54"
   },
   {
+    "name": "UTSA",
+    "slug": "utsa",
+    "logo": "/teams/utsa.png",
+    "primary": "#DE4305",
+    "secondary": "#0C1623"
+  },
+  {
     "name": "Utah",
     "slug": "utah",
     "logo": "/teams/utah.png",
@@ -739,8 +788,8 @@ export const TEAMS: TeamMeta[] = [
     "name": "Vanderbilt",
     "slug": "vanderbilt",
     "logo": "/teams/vanderbilt.png",
-    "primary": "#CD4627",
-    "secondary": "#142840"
+    "primary": "#6D5C38",
+    "secondary": "#8F805C"
   },
   {
     "name": "Virginia",

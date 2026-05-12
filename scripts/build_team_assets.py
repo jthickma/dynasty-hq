@@ -61,8 +61,8 @@ def pick_colors(img_path: Path) -> tuple[str, str]:
     return rgb_to_hex(primary), rgb_to_hex(secondary)
 
 
-def parse_html(html_path: Path) -> list[tuple[str, str]]:
-    """Return [(school_name, first_image_filename), ...]."""
+def parse_html(html_path: Path, resources: Path) -> list[tuple[str, str]]:
+    """Return [(school_name, first_existing_image_filename), ...]."""
     html = html_path.read_text()
     out: list[tuple[str, str]] = []
     for row_match in ROW_RE.finditer(html):
@@ -71,9 +71,10 @@ def parse_html(html_path: Path) -> list[tuple[str, str]]:
         if not name_m:
             continue
         imgs = IMG_RE.findall(row)
-        if not imgs:
+        chosen = next((i for i in imgs if (resources / i).exists()), None)
+        if not chosen:
             continue
-        out.append((htmllib.unescape(name_m.group(1)).strip(), imgs[0]))
+        out.append((htmllib.unescape(name_m.group(1)).strip(), chosen))
     return out
 
 
@@ -103,7 +104,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_ts = Path(args.out_ts)
 
-    pairs = parse_html(html_path)
+    pairs = parse_html(html_path, resources)
     print(f"Parsed {len(pairs)} schools")
 
     teams = []
