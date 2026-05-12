@@ -30,11 +30,11 @@ export function TeamLogo({
       .toUpperCase();
     return (
       <span
-        className={`inline-grid place-items-center rounded shrink-0 text-[10px] font-bold text-black ${className}`}
+        className={`inline-grid place-items-center rounded shrink-0 text-[10px] font-bold text-white ${className}`}
         style={{
           width: size,
           height: size,
-          background: fallbackColor ?? "var(--accent)",
+          background: fallbackColor ?? team?.primary ?? "var(--accent)",
         }}
         title={title ?? school ?? ""}
       >

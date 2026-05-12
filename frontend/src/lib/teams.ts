@@ -1,7 +1,39 @@
-import { TEAMS, type TeamMeta } from "./teams.generated";
+import { TEAMS as GENERATED_TEAMS, type TeamMeta } from "./teams.generated";
 
 export type { TeamMeta };
-export { TEAMS };
+
+const MANUAL_TEAMS: TeamMeta[] = [
+  { name: "Boston College", slug: "boston-college", logo: "/teams/boston-college.png", primary: "#862633", secondary: "#B5A36A" },
+  { name: "Central Michigan", slug: "central-michigan", logo: "/teams/central-michigan.png", primary: "#6A0032", secondary: "#FFC82E" },
+  { name: "Coastal Carolina", slug: "coastal-carolina", logo: "/teams/coastal-carolina.png", primary: "#006F71", secondary: "#876531" },
+  { name: "Eastern Michigan", slug: "eastern-michigan", logo: "/teams/eastern-michigan.png", primary: "#006633", secondary: "#FFFFFF" },
+  { name: "Georgia Southern", slug: "georgia-southern", logo: "/teams/georgia-southern.png", primary: "#00263A", secondary: "#87714D" },
+  { name: "Jacksonville St", slug: "jacksonville-st", logo: "/teams/jacksonville-st.png", primary: "#B50500", secondary: "#000000" },
+  { name: "James Madison", slug: "james-madison", logo: "/teams/james-madison.png", primary: "#450084", secondary: "#CBB677" },
+  { name: "Kennesaw St", slug: "kennesaw-st", logo: "/teams/kennesaw-st.png", primary: "#FFC629", secondary: "#000000" },
+  { name: "LSU", slug: "lsu", logo: "/teams/lsu.png", primary: "#461D7C", secondary: "#FDD023" },
+  { name: "Louisiana Tech", slug: "louisiana-tech", logo: "/teams/louisiana-tech.png", primary: "#002F8B", secondary: "#E31837" },
+  { name: "Middle Tennessee", slug: "middle-tennessee", logo: "/teams/middle-tennessee.png", primary: "#0066CC", secondary: "#FFFFFF" },
+  { name: "Missouri St", slug: "missouri-st", logo: "/teams/missouri-st.png", primary: "#5E0009", secondary: "#FFFFFF" },
+  { name: "New Mexico St", slug: "new-mexico-st", logo: "/teams/new-mexico-st.png", primary: "#861F41", secondary: "#FFFFFF" },
+  { name: "North Carolina", slug: "north-carolina", logo: "/teams/north-carolina.png", primary: "#7BAFD4", secondary: "#FFFFFF" },
+  { name: "Northern Illinois", slug: "northern-illinois", logo: "/teams/northern-illinois.png", primary: "#CC0000", secondary: "#000000" },
+  { name: "Sam Houston", slug: "sam-houston", logo: "/teams/sam-houston.png", primary: "#F56600", secondary: "#FFFFFF" },
+  { name: "South Alabama", slug: "south-alabama", logo: "/teams/south-alabama.png", primary: "#00205B", secondary: "#BF0D3E" },
+  { name: "South Carolina", slug: "south-carolina", logo: "/teams/south-carolina.png", primary: "#73000A", secondary: "#000000" },
+  { name: "Southern Miss", slug: "southern-miss", logo: "/teams/southern-miss.png", primary: "#FFAA3C", secondary: "#000000" },
+  { name: "UMass", slug: "umass", logo: "/teams/umass.png", primary: "#881C1C", secondary: "#FFFFFF" },
+  { name: "UTSA", slug: "utsa", logo: "/teams/utsa.png", primary: "#0C2340", secondary: "#F15A22" },
+  { name: "Washington St", slug: "washington-st", logo: "/teams/washington-st.png", primary: "#981E32", secondary: "#5E6A71" },
+  { name: "Western Kentucky", slug: "western-kentucky", logo: "/teams/western-kentucky.png", primary: "#C8102E", secondary: "#FFFFFF" },
+  { name: "Western Michigan", slug: "western-michigan", logo: "/teams/western-michigan.png", primary: "#6C4023", secondary: "#B5A167" },
+];
+
+const _byName = new Map<string, TeamMeta>();
+for (const t of GENERATED_TEAMS) _byName.set(t.name, t);
+for (const t of MANUAL_TEAMS) if (!_byName.has(t.name)) _byName.set(t.name, t);
+
+export const TEAMS: TeamMeta[] = [..._byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 
 function normalize(s: string): string {
   return s
